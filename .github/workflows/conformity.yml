@@ -1,0 +1,37 @@
+name: Estate Conformity Check
+on:
+  push:
+    branches: [main, master]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install yq
+        run: |
+          sudo wget -qO /usr/local/bin/yq \
+            https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+          sudo chmod +x /usr/local/bin/yq
+
+      - name: Clone product repos
+        run: |
+          mkdir -p /tmp/repos
+          for f in products/*.yaml; do
+            name=$(yq '.name' "$f")
+            repo=$(yq '.repo' "$f")
+            status=$(yq '.status' "$f")
+            if [ "$status" = "archived" ]; then continue; fi
+            gh repo clone "$repo" "/tmp/repos/$name" -- --depth 1 || echo "WARN: failed to clone $repo"
+          done
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+
+      - name: Run conformity checks
+        run: ./checks/check-estate.sh --repos-dir /tmp/repos
+
+      - name: Create issues for gaps
+        run: ./checks/create-issues.sh --repos-dir /tmp/repos
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
