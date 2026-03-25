@@ -1,0 +1,18 @@
+# Local development services for {{PROJECT_NAME}}
+# Usage: docker compose up -d
+# Reset: docker compose down -v && docker compose up -d
+
+services:
+  postgres:
+    image: postgres:17
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: {{project_name}}_dev
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:

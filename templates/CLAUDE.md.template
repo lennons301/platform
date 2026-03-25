@@ -1,0 +1,43 @@
+# {{PROJECT_NAME}}
+
+## Project Overview
+
+{{One-line description}}
+
+## Tech Stack
+
+- **Framework:** {{framework}}
+- **Database:** {{database}}
+- **Auth:** {{auth}}
+- **UI:** shadcn/ui + Tailwind CSS
+- **Deployment:** {{hosting}}
+
+## Commands
+
+```bash
+{{package_manager}} run dev          # Start dev server
+{{package_manager}} run build        # Production build
+{{package_manager}} run lint         # Linting
+{{package_manager}} run test         # Run tests
+{{package_manager}} run db:migrate   # Apply database migrations
+{{package_manager}} run db:seed      # Seed database with dev data
+```
+
+## Project Structure
+
+```
+src/
+  app/              # Next.js App Router
+  components/       # React components (shadcn/ui in components/ui/)
+  lib/              # Shared utilities, database, auth
+```
+
+## Key Conventions
+
+{{Add conventions as they are established during implementation}}
+
+## Platform Context
+
+Platform standards and choices: see /workspace/platform/ (in agent containers)
+or ~/code/platform/ (on local machines).
+This project's registry entry: products/{{project_name}}.yaml
