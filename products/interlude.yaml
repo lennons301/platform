@@ -1,0 +1,32 @@
+name: interlude
+description: Agent-first remote development platform
+category: infrastructure
+repo: lennons301/interlude
+status: active
+package_manager: pnpm
+
+choices:
+  hosting: self-hosted-hetzner
+  database: sqlite
+  auth: none
+  secrets: env-file
+  ui: shadcn-tailwind
+
+versions:
+  node: "22"
+  next: "16"
+  react: "19"
+  typescript: "5.7"
+  pnpm: "9"
+
+divergences:
+  - standard: hosting
+    choice: self-hosted-hetzner
+    reason: >
+      Development platform needs Docker daemon access and persistent containers.
+      Serverless hosting is architecturally incompatible.
+  - standard: secrets
+    choice: env-file
+    reason: >
+      Single VPS deployment. Doppler adds complexity with no benefit
+      when there is one deploy target.

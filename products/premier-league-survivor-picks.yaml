@@ -1,0 +1,25 @@
+name: premier-league-survivor-picks
+description: Premier League survivor picks game (legacy, being replaced by last-person-standing)
+category: product
+repo: lennons301/premier-league-survivor-picks
+status: archived
+package_manager: npm
+
+choices:
+  hosting: vercel-hobby
+  database: supabase
+  auth: supabase-auth
+  orm: supabase-client
+  ui: shadcn-tailwind
+  secrets: env-file
+
+versions:
+  node: "18"
+  next: "14"
+  react: "18"
+  typescript: "5.7"
+
+divergences:
+  - standard: secrets
+    choice: env-file
+    reason: Legacy project, not being actively maintained. Will be decommissioned.

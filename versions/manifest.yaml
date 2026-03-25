@@ -1,0 +1,23 @@
+# versions/manifest.yaml
+# Review cadence: quarterly
+# Last reviewed: 2026-03-25
+
+runtimes:
+  node: "22"  # LTS
+
+frameworks:
+  next: "16"
+  react: "19"
+
+languages:
+  typescript: "5.7"
+
+tooling:
+  pnpm: "9"
+  drizzle-kit: "0.30"
+
+overrides:
+  # Keyed by product category from products/*.yaml
+  # Override resolution: category > default
+  infrastructure: {}
+  # No overrides currently — infrastructure products target the same versions

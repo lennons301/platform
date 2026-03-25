@@ -1,0 +1,22 @@
+name: lemons
+description: Household management platform (recipes, meal planning, calendar, todos, inventory, shopping)
+category: product
+repo: lennons301/lemons
+status: active
+package_manager: npm
+
+choices:
+  hosting: vercel-hobby
+  database: supabase
+  auth: supabase-auth
+  orm: supabase-client
+  ui: shadcn-tailwind
+  secrets: pending-migration
+
+versions:
+  node: "22"
+  next: "16"
+  react: "19"
+  typescript: "5.7"
+
+divergences: []
