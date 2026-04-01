@@ -19,4 +19,13 @@ versions:
   react: "19"
   typescript: "5.7"
 
+architecture:
+  diagrams:
+    - context
+    - containers
+    - deployment
+  staleness_paths:
+    - docker-compose.yml
+    - supabase/
+
 divergences: []

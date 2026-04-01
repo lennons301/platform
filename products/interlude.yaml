@@ -19,6 +19,18 @@ versions:
   typescript: "5.7"
   pnpm: "9"
 
+architecture:
+  diagrams:
+    - context
+    - containers
+    - components-agent-runtime
+    - deployment
+    - dynamic-ci
+  staleness_paths:
+    - docker-compose.yml
+    - Dockerfile
+    - infrastructure/
+
 divergences:
   - standard: hosting
     choice: self-hosted-hetzner
