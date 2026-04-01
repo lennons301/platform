@@ -1,0 +1,1147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Platform & Interlude — AI-Assisted Estate Management</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<style>
+  :root {
+    --bg: #09090b;
+    --surface: #18181b;
+    --surface-2: #1e1e22;
+    --border: #27272a;
+    --border-bright: #3f3f46;
+    --text: #fafafa;
+    --text-muted: #a1a1aa;
+    --text-dim: #71717a;
+    --accent: #3b82f6;
+    --accent-dim: #1e3a5f;
+    --green: #22c55e;
+    --green-dim: #14532d;
+    --yellow: #eab308;
+    --yellow-dim: #422006;
+    --red: #ef4444;
+    --red-dim: #450a0a;
+    --purple: #a78bfa;
+    --mono: 'SF Mono', 'Cascadia Code', 'Fira Code', 'JetBrains Mono', monospace;
+    --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    font-family: var(--sans);
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.7;
+    font-size: 16px;
+  }
+
+  /* --- NAV --- */
+  nav {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 240px;
+    height: 100vh;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    padding: 24px 16px;
+    overflow-y: auto;
+    z-index: 100;
+  }
+  nav .brand {
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    margin-bottom: 24px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  nav a {
+    display: block;
+    padding: 6px 12px;
+    margin: 2px 0;
+    color: var(--text-dim);
+    text-decoration: none;
+    font-size: 13px;
+    border-radius: 6px;
+    transition: all 0.15s;
+  }
+  nav a:hover, nav a.active { color: var(--text); background: var(--surface-2); }
+  nav a.section-head { color: var(--text-muted); font-weight: 600; margin-top: 16px; }
+
+  /* --- MAIN --- */
+  main {
+    margin-left: 240px;
+    max-width: 900px;
+    padding: 48px 48px 120px;
+  }
+
+  section { margin-bottom: 80px; scroll-margin-top: 32px; }
+
+  h1 {
+    font-size: 40px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1.15;
+    margin-bottom: 12px;
+  }
+  h2 {
+    font-size: 28px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    margin-bottom: 20px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  h3 { font-size: 20px; font-weight: 600; margin: 28px 0 12px; }
+  h4 { font-size: 16px; font-weight: 600; margin: 20px 0 8px; color: var(--text-muted); }
+
+  p { margin-bottom: 16px; color: var(--text-muted); }
+  p strong, li strong { color: var(--text); }
+
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  ul, ol { margin: 0 0 16px 20px; color: var(--text-muted); }
+  li { margin-bottom: 6px; }
+
+  /* --- COMPONENTS --- */
+  .subtitle { font-size: 20px; color: var(--text-muted); margin-bottom: 40px; font-weight: 400; }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    margin: 20px 0;
+  }
+  .card.accent { border-color: var(--accent-dim); background: linear-gradient(135deg, var(--surface), var(--accent-dim) 200%); }
+  .card.green { border-color: var(--green-dim); }
+  .card.yellow { border-color: var(--yellow-dim); }
+  .card.red { border-color: var(--red-dim); }
+
+  .card-title {
+    font-size: 14px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 12px;
+  }
+  .card-title.blue { color: var(--accent); }
+  .card-title.green { color: var(--green); }
+  .card-title.yellow { color: var(--yellow); }
+  .card-title.red { color: var(--red); }
+  .card-title.purple { color: var(--purple); }
+
+  .badge {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 99px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .badge.green { background: var(--green-dim); color: var(--green); }
+  .badge.yellow { background: var(--yellow-dim); color: var(--yellow); }
+  .badge.red { background: var(--red-dim); color: var(--red); }
+  .badge.blue { background: var(--accent-dim); color: var(--accent); }
+  .badge.dim { background: var(--surface-2); color: var(--text-dim); }
+
+  pre {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 20px;
+    overflow-x: auto;
+    font-family: var(--mono);
+    font-size: 13px;
+    line-height: 1.6;
+    margin: 16px 0;
+    color: var(--text-muted);
+  }
+  code {
+    font-family: var(--mono);
+    font-size: 0.9em;
+    background: var(--surface-2);
+    padding: 2px 6px;
+    border-radius: 4px;
+  }
+  pre code { background: none; padding: 0; }
+
+  .pass { color: var(--green); }
+  .fail { color: var(--red); }
+  .warn { color: var(--yellow); }
+  .divg { color: var(--purple); }
+
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 20px 0; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin: 20px 0; }
+
+  .pressure-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; margin: 24px 0; }
+
+  .stat { text-align: center; padding: 20px; }
+  .stat-value { font-size: 36px; font-weight: 700; color: var(--text); }
+  .stat-label { font-size: 13px; color: var(--text-dim); margin-top: 4px; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0;
+    font-size: 14px;
+  }
+  th, td {
+    padding: 10px 14px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+  }
+  th {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-dim);
+  }
+  td { color: var(--text-muted); }
+
+  details {
+    margin: 16px 0;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  summary {
+    padding: 12px 16px;
+    cursor: pointer;
+    font-weight: 500;
+    font-size: 14px;
+    background: var(--surface);
+    user-select: none;
+  }
+  summary:hover { background: var(--surface-2); }
+  details > div { padding: 16px; }
+
+  .timeline {
+    border-left: 2px solid var(--border);
+    margin: 24px 0 24px 12px;
+    padding-left: 24px;
+  }
+  .timeline-item {
+    position: relative;
+    margin-bottom: 24px;
+  }
+  .timeline-item::before {
+    content: '';
+    position: absolute;
+    left: -31px;
+    top: 6px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--border);
+    border: 2px solid var(--bg);
+  }
+  .timeline-item.done::before { background: var(--green); }
+  .timeline-item.current::before { background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+  .timeline-item.future::before { background: var(--border); }
+  .timeline-label { font-weight: 600; font-size: 15px; margin-bottom: 4px; }
+  .timeline-desc { font-size: 13px; color: var(--text-dim); }
+
+  .diagram-container {
+    margin: 24px 0;
+    padding: 24px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow-x: auto;
+  }
+  .diagram-container .mermaid { display: flex; justify-content: center; }
+
+  .demo-box {
+    background: linear-gradient(135deg, var(--accent-dim), var(--surface));
+    border: 1px solid var(--accent);
+    border-radius: 12px;
+    padding: 20px 24px;
+    margin: 20px 0;
+  }
+  .demo-box h4 { color: var(--accent); margin-top: 0; font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; }
+  .demo-box p { font-size: 14px; }
+
+  .callout {
+    padding: 16px 20px;
+    border-radius: 8px;
+    margin: 20px 0;
+    font-size: 14px;
+  }
+  .callout.info { background: var(--accent-dim); border-left: 3px solid var(--accent); }
+  .callout.warn { background: var(--yellow-dim); border-left: 3px solid var(--yellow); }
+
+  hr { border: none; border-top: 1px solid var(--border); margin: 48px 0; }
+
+  @media (max-width: 900px) {
+    nav { display: none; }
+    main { margin-left: 0; padding: 24px 20px 80px; }
+    .grid-2, .grid-3, .pressure-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="brand">Platform Estate</div>
+  <a href="#hero">Overview</a>
+  <a href="#problem" class="section-head">The Problem</a>
+  <a href="#estate">The Estate</a>
+  <a href="#platform" class="section-head">Platform — The Brain</a>
+  <a href="#standards">Standards</a>
+  <a href="#choices">Choices</a>
+  <a href="#golden-path">Golden Path</a>
+  <a href="#conformity">Conformity Checks</a>
+  <a href="#interlude" class="section-head">Interlude — The Hands</a>
+  <a href="#what-interlude-does">What It Does</a>
+  <a href="#interlude-arch">Architecture</a>
+  <a href="#task-lifecycle">Task Lifecycle</a>
+  <a href="#together" class="section-head">Working Together</a>
+  <a href="#cost" class="section-head">Cost Discipline</a>
+  <a href="#roadmap" class="section-head">Roadmap</a>
+  <a href="#near-term">Near Term</a>
+  <a href="#medium-term">Medium Term</a>
+  <a href="#blue-sky">Blue Sky</a>
+  <a href="#demos" class="section-head">Demos</a>
+</nav>
+
+<main>
+
+<!-- ============================================================ -->
+<section id="hero">
+  <h1>Platform & Interlude</h1>
+  <p class="subtitle">AI-assisted estate management for a portfolio of side projects</p>
+
+  <div class="grid-3">
+    <div class="card">
+      <div class="stat">
+        <div class="stat-value">3</div>
+        <div class="stat-label">Active projects</div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="stat">
+        <div class="stat-value">1</div>
+        <div class="stat-label">Engineer</div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="stat">
+        <div class="stat-value">6</div>
+        <div class="stat-label">Decision areas governed</div>
+      </div>
+    </div>
+  </div>
+
+  <p>Two repos that work together: <strong>Platform</strong> is the brain (what should the estate look like?) and <strong>Interlude</strong> is the hands (dispatch AI agents to do the work). Between them, they aim to make a one-person operation feel like a team.</p>
+</section>
+
+<!-- ============================================================ -->
+<section id="problem">
+  <h2>The Problem</h2>
+  <p>Running multiple side projects solo creates three compounding pressures:</p>
+
+  <div class="pressure-grid">
+    <div class="card">
+      <div class="card-title red">Consistency</div>
+      <p>Without discipline, tech choices drift. One project uses Supabase Auth, another uses Better Auth, a third has no auth strategy. Secrets end up in <code>.env</code> files. Versions fall behind. Every project becomes its own snowflake.</p>
+    </div>
+    <div class="card">
+      <div class="card-title yellow">Cost</div>
+      <p>This can't cost more than just paying for managed services. Every choice must be <strong>free-tier-first</strong>. The infrastructure to manage projects shouldn't exceed the cost of running them.</p>
+    </div>
+    <div class="card">
+      <div class="card-title blue">Context</div>
+      <p>AI agents are the force multiplier — but every agent session starts from zero. Without a shared source of truth, you re-explain conventions, stack choices, and project structure every time.</p>
+    </div>
+  </div>
+
+  <p>The solution: encode decisions once, enforce them automatically, and give agents the context they need to work autonomously.</p>
+</section>
+
+<!-- ============================================================ -->
+<section id="estate">
+  <h2>The Estate</h2>
+
+  <div class="diagram-container">
+    <pre class="mermaid">
+%%{init: {'theme': 'dark', 'themeVariables': { 'primaryColor': '#3b82f6', 'primaryTextColor': '#fafafa', 'primaryBorderColor': '#3b82f6', 'lineColor': '#71717a', 'secondaryColor': '#27272a', 'tertiaryColor': '#18181b', 'fontSize': '14px'}}}%%
+graph TB
+    subgraph PLATFORM["&lt;b&gt;Platform Repo&lt;/b&gt; — The Brain"]
+        S[Standards]
+        C[Choices]
+        V[Versions]
+        CH[Conformity Checks]
+    end
+
+    subgraph INTERLUDE["&lt;b&gt;Interlude&lt;/b&gt; — The Hands"]
+        TM[Task Manager]
+        AG[Agent Containers]
+        PR[Preview Server]
+    end
+
+    subgraph PRODUCTS["Product Repos"]
+        LPS["Last Person Standing&lt;br/&gt;&lt;i&gt;Neon + Better Auth + Drizzle&lt;/i&gt;"]
+        LEM["Lemons&lt;br/&gt;&lt;i&gt;Supabase + Supabase Auth&lt;/i&gt;"]
+        PLSP["Premier League Survivor Picks&lt;br/&gt;&lt;i&gt;archived&lt;/i&gt;"]
+    end
+
+    GH[GitHub]
+    VCL[Vercel]
+    HZ[Hetzner VPS]
+
+    PLATFORM -- "defines standards for" --> PRODUCTS
+    PLATFORM -- "mounted as context into" --> INTERLUDE
+    INTERLUDE -- "dispatches agents to work on" --> PRODUCTS
+    INTERLUDE -- "pushes branches & PRs" --> GH
+    PRODUCTS -- "deployed to" --> VCL
+    INTERLUDE -- "hosted on" --> HZ
+    CH -- "creates issues in" --> GH
+
+    style PLATFORM fill:#1e3a5f,stroke:#3b82f6,color:#fafafa
+    style INTERLUDE fill:#14532d,stroke:#22c55e,color:#fafafa
+    style PRODUCTS fill:#27272a,stroke:#3f3f46,color:#fafafa
+    style LPS fill:#18181b,stroke:#3f3f46,color:#a1a1aa
+    style LEM fill:#18181b,stroke:#3f3f46,color:#a1a1aa
+    style PLSP fill:#18181b,stroke:#27272a,color:#52525b
+    </pre>
+  </div>
+
+  <table>
+    <thead>
+      <tr><th>Project</th><th>Category</th><th>Status</th><th>Stack</th><th>Hosting</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Last Person Standing</strong></td>
+        <td>Product</td>
+        <td><span class="badge green">Active</span></td>
+        <td>Neon, Better Auth, Drizzle, Doppler</td>
+        <td>Vercel Hobby</td>
+      </tr>
+      <tr>
+        <td><strong>Lemons</strong></td>
+        <td>Product</td>
+        <td><span class="badge green">Active</span></td>
+        <td>Supabase, Supabase Auth, Supabase Client</td>
+        <td>Vercel Hobby</td>
+      </tr>
+      <tr>
+        <td><strong>Interlude</strong></td>
+        <td>Infrastructure</td>
+        <td><span class="badge green">Active</span></td>
+        <td>SQLite, Drizzle, env-file</td>
+        <td>Hetzner VPS</td>
+      </tr>
+      <tr>
+        <td><strong>Premier League Survivor Picks</strong></td>
+        <td>Product</td>
+        <td><span class="badge dim">Archived</span></td>
+        <td>Supabase (legacy Next.js 14)</td>
+        <td>Vercel Hobby</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p>All active projects target <strong>Next.js 16</strong>, <strong>React 19</strong>, <strong>Node 22</strong>, <strong>TypeScript 5.7</strong>, and <strong>shadcn/ui + Tailwind</strong>.</p>
+</section>
+
+<!-- ============================================================ -->
+<section id="platform">
+  <h2>Platform — The Brain</h2>
+  <p>The platform repo is the single source of truth for how every project should look. It defines <strong>what</strong> (standards), <strong>which</strong> (choices), and <strong>how new</strong> (versions) — then <strong>verifies</strong> (conformity checks).</p>
+
+<pre>
+platform/
+├── standards/     5 principles (tool-agnostic rules)
+├── choices/       6 decision areas (specific tools)
+├── versions/      Target runtime & framework versions
+├── products/      Registry of every managed project
+├── checks/        Shell scripts that validate conformity
+├── templates/     Starters for new projects
+└── .github/       CI that runs checks on push
+</pre>
+</section>
+
+<!-- ============================================================ -->
+<section id="standards">
+  <h3>Standards</h3>
+  <p>Five tool-agnostic principles. These don't change when you swap a database — they define <em>what must be true</em> regardless of tooling.</p>
+
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title blue">Environments</div>
+      <p>Exactly 3 environments: <code>dev</code>, <code>stg</code>, <code>prd</code>. Isolated. Production credentials never touch dev.</p>
+    </div>
+    <div class="card">
+      <div class="card-title blue">Secrets</div>
+      <p>Single remote provider as source of truth. Never committed, never hardcoded. Per-environment scoping.</p>
+    </div>
+    <div class="card">
+      <div class="card-title blue">Local Development</div>
+      <p>All projects run with local Docker services. If your laptop is offline, development still works.</p>
+    </div>
+    <div class="card">
+      <div class="card-title blue">Documentation</div>
+      <p>Every project maintains a <code>CLAUDE.md</code> as primary technical reference. Updated at the end of each implementation phase.</p>
+    </div>
+    <div class="card">
+      <div class="card-title blue">Testing</div>
+      <p>Every project has automated tests running against local services. CI runs them on every PR.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<section id="choices">
+  <h3>Choices</h3>
+  <p>Each decision area has a <strong>decision matrix</strong> — not a mandate. Projects pick from evaluated options. Reviewed quarterly.</p>
+
+  <details>
+    <summary><strong>Database</strong> — Neon vs Supabase vs SQLite</summary>
+    <div>
+      <table>
+        <thead><tr><th>Option</th><th>Free Tier</th><th>Best For</th><th>Trade-off</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Neon</strong></td><td>10 projects, 0.5GB each</td><td>Pure Postgres, Drizzle pairing</td><td>Postgres only — no bundled auth/storage</td></tr>
+          <tr><td><strong>Supabase</strong></td><td>2 projects, 500MB each</td><td>Full BaaS (auth + storage + realtime)</td><td>Fewer free projects, vendor coupling</td></tr>
+          <tr><td><strong>SQLite</strong></td><td>Free forever</td><td>Single-server, infrastructure projects</td><td>No remote access, single-writer</td></tr>
+        </tbody>
+      </table>
+      <p><strong>Environment strategy for Neon:</strong> dev = local Docker Postgres, stg = Neon ephemeral branch (free), prd = Neon main branch.</p>
+      <div class="callout warn">Use the <code>postgres</code> driver (postgres.js), NOT <code>@neondatabase/serverless</code>. The websocket driver breaks local Docker Postgres.</div>
+    </div>
+  </details>
+
+  <details>
+    <summary><strong>Auth</strong> — Better Auth vs Supabase Auth vs Clerk vs Auth.js</summary>
+    <div>
+      <table>
+        <thead><tr><th>Option</th><th>Data Ownership</th><th>Free Tier</th><th>Best For</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Better Auth</strong></td><td>Your DB</td><td>Unlimited</td><td>Neon + Drizzle projects</td></tr>
+          <tr><td><strong>Supabase Auth</strong></td><td>Supabase</td><td>50k MAU</td><td>Already on Supabase</td></tr>
+          <tr><td><strong>Clerk</strong></td><td>Clerk's infra</td><td>50k MAU</td><td>Fastest DX, drop-in components</td></tr>
+          <tr><td><strong>Auth.js v5</strong></td><td>Your DB</td><td>Unlimited</td><td>Most community support</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </details>
+
+  <details>
+    <summary><strong>Secrets</strong> — Doppler (default)</summary>
+    <div>
+      <p>Canonical provider for all projects. Setup: create project in Doppler dashboard, add secrets for dev/stg/prd. Local dev: <code>doppler run -- npm run dev</code>. Vercel: sync prd environment to Vercel env vars.</p>
+      <p><code>.env.local</code> is gitignored and ephemeral — a cache, not the source of truth.</p>
+    </div>
+  </details>
+
+  <details>
+    <summary><strong>Hosting</strong> — Vercel Hobby (default)</summary>
+    <div>
+      <p>Shared across the estate: 100 GB bandwidth, 1M invocations, 4 CPU-hours/mo, 6k build-minutes. Non-commercial restriction — upgrade to Pro ($20/mo) if revenue-generating.</p>
+      <p>Exception: self-hosted Hetzner VPS for projects needing Docker daemon access (Interlude).</p>
+    </div>
+  </details>
+
+  <details>
+    <summary><strong>ORM</strong> — Drizzle vs Supabase Client</summary>
+    <div>
+      <p><strong>Drizzle:</strong> Type-safe, pairs with Neon/Better Auth. <strong>Supabase Client:</strong> Auto-generated types from schema, tied to Supabase.</p>
+    </div>
+  </details>
+
+  <details>
+    <summary><strong>UI</strong> — shadcn/ui + Tailwind (universal)</summary>
+    <div>
+      <p>All frontend projects. Components are source code, not dependencies. Dark mode via <code>className="dark"</code>. Use <code>cn()</code> utility for conditional classes.</p>
+    </div>
+  </details>
+</section>
+
+<!-- ============================================================ -->
+<section id="golden-path">
+  <h3>The Golden Path — Last Person Standing</h3>
+  <p>A fully conformant project with <strong>zero divergences</strong>. This is what a new project looks like when it follows every default.</p>
+
+<pre><code># products/last-person-standing.yaml
+
+name: last-person-standing
+description: Premier League Survivor Picks game (clean-room Next.js 16 rewrite)
+category: product
+repo: lennons301/last-person-standing
+status: active
+package_manager: npm
+
+choices:
+  hosting:  vercel-hobby      # Default
+  database: neon              # Default for new projects
+  auth:     better-auth       # Default — data in your own DB
+  orm:      drizzle           # Default — pairs with Neon
+  ui:       shadcn-tailwind   # Universal
+  secrets:  doppler           # Default
+
+versions:
+  node: "22"                  # Current LTS
+  next: "16"                  # Current framework
+  react: "19"                 # Current
+  typescript: "5.7"           # Current
+
+divergences: []               # Fully conformant</code></pre>
+
+  <h3>Intentional Divergences — Interlude</h3>
+  <p>Not every project can follow defaults. The system handles this by requiring <strong>documented reasons</strong>, not exceptions or workarounds.</p>
+
+<pre><code># products/interlude.yaml — divergences section
+
+divergences:
+  - standard: hosting
+    choice: self-hosted-hetzner
+    reason: >
+      Development platform needs Docker daemon access
+      and persistent containers. Serverless hosting is
+      architecturally incompatible.
+
+  - standard: secrets
+    choice: env-file
+    reason: >
+      Single VPS deployment. Doppler adds complexity
+      with no benefit when there is one deploy target.</code></pre>
+
+  <p>Conformity checks see divergences and report them as <span class="divg">✓*</span> (acknowledged), not <span class="fail">✗</span> (gap).</p>
+</section>
+
+<!-- ============================================================ -->
+<section id="conformity">
+  <h3>Conformity Checks</h3>
+  <p>Shell scripts that validate every project against the standards. Run locally or in CI.</p>
+
+  <div class="demo-box">
+    <h4>Demo — Run this live</h4>
+    <p><code>./checks/check-estate.sh</code></p>
+  </div>
+
+<pre>
+<strong>Estate Conformity Report — 2026-03-31</strong>
+═══════════════════════════════════════
+interlude:
+  secrets: <span class="divg">✓*</span> (intentional divergence)
+  versions: <span class="fail">✗</span> (drizzle-kit: unknown → 0.30)
+  environments: <span class="pass">✓</span>
+  documentation: <span class="fail">✗</span> (missing section: command missing section: stack|tech)
+
+last-person-standing:
+  secrets: <span class="fail">✗</span> (no doppler.yaml found)
+  versions: <span class="fail">✗</span> (pnpm: unknown → 9 drizzle-kit: unknown → 0.30)
+  environments: <span class="pass">✓</span>
+  documentation: <span class="pass">✓</span>
+
+lemons:
+  secrets: <span class="fail">✗</span> (not yet migrated to Doppler)
+  versions: <span class="fail">✗</span> (pnpm: unknown → 9 drizzle-kit: unknown → 0.30)
+  environments: <span class="pass">✓</span>
+  documentation: <span class="pass">✓</span>
+
+═══════════════════════════════════════
+<span class="fail">6 gap(s)</span> found across 3 product(s).
+Run checks/create-issues.sh to file GitHub Issues.
+</pre>
+
+  <p><strong>CI pipeline:</strong> On every push to main, GitHub Actions clones all product repos, runs checks, and auto-creates GitHub Issues for any gaps found.</p>
+
+  <div class="diagram-container">
+    <pre class="mermaid">
+%%{init: {'theme': 'dark', 'themeVariables': { 'fontSize': '14px'}}}%%
+graph LR
+    A["Push to<br/>platform/main"] --> B["CI clones<br/>product repos"]
+    B --> C["Run<br/>check-estate.sh"]
+    C --> D{"Gaps?"}
+    D -- "Yes" --> E["create-issues.sh<br/>files GitHub Issues"]
+    D -- "No" --> F["All clear"]
+    E --> G["Human or agent<br/>fixes gaps"]
+    G --> H["PR merged"]
+    H --> C
+
+    style A fill:#1e3a5f,stroke:#3b82f6,color:#fafafa
+    style E fill:#450a0a,stroke:#ef4444,color:#fafafa
+    style F fill:#14532d,stroke:#22c55e,color:#fafafa
+    </pre>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<section id="interlude">
+  <h2>Interlude — The Hands</h2>
+</section>
+
+<section id="what-interlude-does">
+  <h3>What It Does</h3>
+  <p>A self-hosted platform that lets you dispatch development tasks to AI agents from a mobile-friendly web UI, watch them work in real-time, and receive completed work as GitHub pull requests.</p>
+
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title green">Dispatch from anywhere</div>
+      <p>Mobile-friendly PWA. Create a task, describe what you want, and an agent picks it up.</p>
+    </div>
+    <div class="card">
+      <div class="card-title green">Real-time streaming</div>
+      <p>Watch the agent think, write code, and run commands via SSE-streamed output in a chat UI.</p>
+    </div>
+    <div class="card">
+      <div class="card-title green">Multi-turn conversations</div>
+      <p>Containers persist between turns. Send follow-up messages. The agent resumes with full context.</p>
+    </div>
+    <div class="card">
+      <div class="card-title green">Live preview</div>
+      <p>Agent starts a dev server? It's proxied to a subdomain with auto-TLS. Preview in an iframe or share the URL.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<section id="interlude-arch">
+  <h3>Architecture</h3>
+
+  <div class="diagram-container">
+    <pre class="mermaid">
+%%{init: {'theme': 'dark', 'themeVariables': { 'fontSize': '13px'}}}%%
+graph TB
+    USER["User<br/>(mobile / desktop)"]
+    CADDY["Caddy<br/>Reverse Proxy + Auto-TLS"]
+
+    subgraph VPS["Hetzner VPS (~€4.50/mo)"]
+        subgraph APP["Next.js 16 App"]
+            CS["Custom Server<br/>(Host header routing)"]
+            API["API Routes<br/>(task lifecycle)"]
+            UI["React UI<br/>(chat, preview, feed)"]
+            SSE["SSE Stream<br/>(real-time updates)"]
+            DB["SQLite<br/>(WAL mode)"]
+            ORCH["Orchestrator<br/>(turn manager, queue)"]
+        end
+
+        DOCKER["Docker Daemon"]
+
+        subgraph CONTAINERS["Agent Containers"]
+            C1["Container: task-abc<br/>Claude Code CLI + git"]
+            C2["Container: task-def<br/>Claude Code CLI + git"]
+        end
+    end
+
+    GH["GitHub<br/>(branches, PRs)"]
+    PLAT["Platform Repo<br/>(mounted at /workspace/platform/)"]
+
+    USER --> CADDY
+    CADDY --> CS
+    CS --> API
+    CS --> UI
+    API --> SSE
+    API --> ORCH
+    ORCH --> DOCKER
+    DOCKER --> C1
+    DOCKER --> C2
+    API --> DB
+    C1 --> GH
+    C2 --> GH
+    PLAT -.-> C1
+    PLAT -.-> C2
+    CADDY -- "*.interludes.co.uk" --> CS
+
+    style VPS fill:#18181b,stroke:#3f3f46,color:#fafafa
+    style APP fill:#1e3a5f,stroke:#3b82f6,color:#fafafa
+    style CONTAINERS fill:#14532d,stroke:#22c55e,color:#fafafa
+    </pre>
+  </div>
+
+  <h4>Key Infrastructure Decisions</h4>
+  <table>
+    <thead><tr><th>Component</th><th>Choice</th><th>Why</th></tr></thead>
+    <tbody>
+      <tr><td>Hosting</td><td>Hetzner CX22</td><td>~€4.50/mo. Docker daemon access. Can't do this on Vercel.</td></tr>
+      <tr><td>Database</td><td>SQLite (WAL)</td><td>Single server, zero ops, fast. No need for a remote DB.</td></tr>
+      <tr><td>TLS</td><td>Caddy on-demand TLS</td><td>Auto-provisions certs per subdomain. Zero config.</td></tr>
+      <tr><td>Preview</td><td>Subdomain routing</td><td><code>task-{id}.interludes.co.uk</code> — real browser origin, cookies/auth/routing all work.</td></tr>
+      <tr><td>AI</td><td>Claude Code CLI</td><td>Runs in containers with <code>--output-format stream-json</code>. Parsed into structured messages.</td></tr>
+      <tr><td>Agent context</td><td>Platform repo mount</td><td>Every agent container gets <code>/workspace/platform/</code> — instant access to estate standards.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ============================================================ -->
+<section id="task-lifecycle">
+  <h3>Task Lifecycle</h3>
+
+  <div class="diagram-container">
+    <pre class="mermaid">
+%%{init: {'theme': 'dark', 'themeVariables': { 'fontSize': '13px'}}}%%
+sequenceDiagram
+    actor User
+    participant UI as Chat UI
+    participant API as Next.js API
+    participant Orch as Orchestrator
+    participant Docker as Docker
+    participant Agent as Claude Code
+    participant GH as GitHub
+
+    User->>UI: Create task
+    UI->>API: POST /api/tasks
+    API->>API: Insert task (queued)
+    API-->>UI: Task ID
+
+    User->>UI: Click "Run"
+    UI->>API: POST /api/tasks/{id}/run
+    API->>Orch: Start task (fire & forget)
+    Orch->>Docker: Create container
+    Docker-->>Orch: Container ready
+    Orch->>Agent: Run Claude Code
+
+    loop Stream output
+        Agent-->>Orch: NDJSON events
+        Orch->>API: Insert messages to DB
+        UI->>API: SSE /api/tasks/{id}/stream
+        API-->>UI: New messages
+    end
+
+    Agent->>GH: git push (branch)
+    Agent-->>Orch: Turn complete
+    Orch->>API: Update task status
+
+    User->>UI: Send follow-up message
+    UI->>API: POST /api/tasks/{id}/messages
+    Orch->>Agent: Resume with --resume
+    Agent->>GH: git push (updated)
+    Agent-->>Orch: Turn complete
+    </pre>
+  </div>
+
+  <div class="demo-box">
+    <h4>Demo — Create and run a task</h4>
+    <p>Open Interlude on mobile. Create a task against a repo. Watch the agent stream output in the chat UI. Send a follow-up. See the live preview of the dev server.</p>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<section id="together">
+  <h2>Working Together</h2>
+  <p>Platform and Interlude form a feedback loop. The platform defines intent; Interlude (and agents within it) execute; conformity checks close the loop.</p>
+
+  <div class="diagram-container">
+    <pre class="mermaid">
+%%{init: {'theme': 'dark', 'themeVariables': { 'fontSize': '14px'}}}%%
+graph TB
+    A["<b>Platform defines</b><br/>standards, choices, versions"] --> B["<b>Agent works</b><br/>via Interlude, in context"]
+    B --> C["<b>Code ships</b><br/>PR merged to product repo"]
+    C --> D["<b>Checks run</b><br/>CI validates conformity"]
+    D --> E{"Conformant?"}
+    E -- "Yes" --> F["Estate healthy"]
+    E -- "No" --> G["Issue created"]
+    G --> B
+
+    style A fill:#1e3a5f,stroke:#3b82f6,color:#fafafa
+    style B fill:#14532d,stroke:#22c55e,color:#fafafa
+    style F fill:#14532d,stroke:#22c55e,color:#fafafa
+    style G fill:#450a0a,stroke:#ef4444,color:#fafafa
+    </pre>
+  </div>
+
+  <p>The critical piece: <strong>agents inherit platform context automatically</strong>. When an agent container starts, it has <code>/workspace/platform/</code> mounted with all standards, choices, and version targets. The agent's <code>CLAUDE.md</code> points to it. This means agents naturally produce conformant code without being told the rules every time.</p>
+</section>
+
+<!-- ============================================================ -->
+<section id="cost">
+  <h2>Cost Discipline</h2>
+  <p>A core design principle: <strong>this infrastructure should cost less than just paying for hosted services</strong>. The platform encodes cost constraints as first-class decisions.</p>
+
+  <table>
+    <thead><tr><th>Service</th><th>Cost</th><th>What You Get</th></tr></thead>
+    <tbody>
+      <tr><td>Vercel Hobby</td><td>Free</td><td>Hosting for all product repos (shared limits)</td></tr>
+      <tr><td>Neon</td><td>Free</td><td>10 Postgres databases, 0.5GB each, branching</td></tr>
+      <tr><td>Supabase</td><td>Free</td><td>2 projects with auth + storage + realtime</td></tr>
+      <tr><td>Doppler</td><td>Free</td><td>Secrets management for all projects</td></tr>
+      <tr><td>Hetzner CX22</td><td>~€4.50/mo</td><td>VPS for Interlude (Docker, persistent containers)</td></tr>
+      <tr><td>Claude (API/subscription)</td><td>Variable</td><td>Agent compute — per-task budgets ($5 default max)</td></tr>
+      <tr><td>GitHub</td><td>Free</td><td>Repos, Actions CI, Issues</td></tr>
+    </tbody>
+  </table>
+
+  <p><strong>Total fixed cost: ~€4.50/mo</strong> (just the VPS). Everything else is free tier or usage-based with hard caps.</p>
+
+  <div class="callout info">Interlude tracks cost per task (Anthropic API spend). Default budget: $5/task, 50 turns max. You see accumulated cost in the chat UI.</div>
+</section>
+
+<!-- ============================================================ -->
+<section id="roadmap">
+  <h2>Roadmap</h2>
+
+  <h3 id="current-state">Current State</h3>
+  <div class="timeline">
+    <div class="timeline-item done">
+      <div class="timeline-label">Phase 1 — Chat UI + API <span class="badge green">Done</span></div>
+      <div class="timeline-desc">Task/chat interface, SQLite, SSE streaming, mobile PWA</div>
+    </div>
+    <div class="timeline-item done">
+      <div class="timeline-label">Phase 2a — Agent Orchestrator <span class="badge green">Done</span></div>
+      <div class="timeline-desc">Docker containers, Claude Code execution, output parsing, task lifecycle</div>
+    </div>
+    <div class="timeline-item done">
+      <div class="timeline-label">Phase 2.5 — VPS Deployment <span class="badge green">Done</span></div>
+      <div class="timeline-desc">Dockerised app, Caddy + auto-SSL, Hetzner CX22, GitHub Actions CI/CD</div>
+    </div>
+    <div class="timeline-item done">
+      <div class="timeline-label">Phase 2b — Interactive Chat <span class="badge green">Done</span></div>
+      <div class="timeline-desc">Multi-turn conversations, persistent containers, <code>--resume</code>, message queue</div>
+    </div>
+    <div class="timeline-item done">
+      <div class="timeline-label">Phase 2c — Live Preview <span class="badge green">Done</span></div>
+      <div class="timeline-desc">Proxy container dev servers, iframe preview, hot reload</div>
+    </div>
+    <div class="timeline-item done">
+      <div class="timeline-label">Phase 2d — Subdomain Preview <span class="badge green">Done</span></div>
+      <div class="timeline-desc"><code>task-{id}.interludes.co.uk</code>, on-demand TLS, WebSocket proxy, Docker DNS</div>
+    </div>
+    <div class="timeline-item current">
+      <div class="timeline-label">Phase 3 — GitHub Integration <span class="badge blue">In Progress</span></div>
+      <div class="timeline-desc">GitHub App, issue ↔ task sync, auto-PR creation, webhook-driven dispatch</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<section id="near-term">
+  <h3>Near Term — Phases 3–5</h3>
+
+  <div class="card accent">
+    <div class="card-title blue">Phase 3: GitHub as the Interface</div>
+    <p>Label a GitHub issue <code>interlude</code> → webhook fires → task auto-created → agent works → draft PR filed → PR marked ready on completion → issue gets cost/status comments.</p>
+    <p>This is the bridge to autonomous operation: <strong>the trigger moves from a UI button to a GitHub label</strong>.</p>
+  </div>
+
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title blue">Phase 4: Notification Bot</div>
+      <p>Slack or Telegram bot for bidirectional messaging. Get notified when tasks complete. Dispatch tasks from chat. "Fix the login bug on lemons" → agent runs.</p>
+    </div>
+    <div class="card">
+      <div class="card-title blue">Phase 5: Production Hardening</div>
+      <p>Container resource limits (CPU/memory caps), automated SQLite backups, monitoring/alerting, push notifications.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<section id="medium-term">
+  <h3>Medium Term — Platform Gets a UI</h3>
+
+  <p>Today, the platform repo is a collection of YAML and markdown files. The medium-term vision: <strong>it becomes a dashboard</strong>.</p>
+
+  <div class="card">
+    <div class="card-title purple">Platform UI — The Control Plane</div>
+    <ul>
+      <li><strong>Estate health dashboard:</strong> See conformity status across all projects at a glance. Drill into gaps. Click to trigger remediation.</li>
+      <li><strong>Choice browser:</strong> Interactive decision matrices. Compare options, see which projects use what, model cost impact of changes.</li>
+      <li><strong>Version tracker:</strong> Which projects are behind? One-click upgrade dispatch (agent creates upgrade PR).</li>
+      <li><strong>Task feed:</strong> Unified view of all agent work across the estate. Filter by project, status, cost.</li>
+      <li><strong>Project onboarding:</strong> Wizard that scaffolds a new project from templates, provisions services (Doppler, Neon, Vercel), and runs conformity checks before a human writes a line.</li>
+    </ul>
+  </div>
+
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title purple">Phase 6: On-Demand Compute</div>
+      <p>Cloud provider API for dynamic machine provisioning. Orchestrator decides local VPS vs cloud based on task complexity and queue depth. Auto-teardown after completion.</p>
+    </div>
+    <div class="card">
+      <div class="card-title purple">Phase 7: Multi-Agent Workflows</div>
+      <p>Agent roles (architect, implementer, reviewer). Task decomposition into subtasks. DAG execution — agent A's output feeds agent B. Parallel branches with automated integration.</p>
+    </div>
+  </div>
+
+  <div class="diagram-container">
+    <pre class="mermaid">
+%%{init: {'theme': 'dark', 'themeVariables': { 'fontSize': '13px'}}}%%
+graph TB
+    subgraph UI["Platform UI (Control Plane)"]
+        DASH["Estate Dashboard"]
+        TASKS["Task Feed"]
+        PROJ["Project Manager"]
+    end
+
+    subgraph ENGINE["Interlude (Execution Engine)"]
+        ORCH["Orchestrator"]
+        Q["Task Queue"]
+        LOCAL["Local VPS"]
+        CLOUD["Cloud Compute"]
+    end
+
+    subgraph AGENTS["Agent Pool"]
+        ARCH["Architect Agent"]
+        IMPL1["Implementer A"]
+        IMPL2["Implementer B"]
+        REV["Reviewer Agent"]
+    end
+
+    DASH --> Q
+    TASKS --> ORCH
+    PROJ --> Q
+    ORCH --> LOCAL
+    ORCH --> CLOUD
+    LOCAL --> IMPL1
+    CLOUD --> IMPL2
+    ARCH --> IMPL1
+    ARCH --> IMPL2
+    IMPL1 --> REV
+    IMPL2 --> REV
+
+    style UI fill:#1e1e22,stroke:#a78bfa,color:#fafafa
+    style ENGINE fill:#14532d,stroke:#22c55e,color:#fafafa
+    style AGENTS fill:#1e3a5f,stroke:#3b82f6,color:#fafafa
+    </pre>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<section id="blue-sky">
+  <h3>Blue Sky — Autonomous Estate Management</h3>
+
+  <p>The end state: <strong>the platform repo evolves from a document into a control plane, and Interlude evolves from a task runner into the execution engine for that control plane</strong>.</p>
+
+  <div class="card">
+    <div class="card-title purple">Self-Healing Conformity</div>
+    <p>Conformity gap detected → agent automatically creates a branch, fixes the drift, files a PR. No human involvement for routine fixes (missing <code>doppler.yaml</code>, outdated version, missing CLAUDE.md section). Human review for anything structural.</p>
+  </div>
+
+  <div class="card">
+    <div class="card-title purple">Automated Upgrades</div>
+    <p>New version of Next.js released → agent upgrades a low-risk project first → validates (tests pass, build succeeds, conformity checks green) → rolls out across the estate in priority order. Version manifest updates automatically.</p>
+  </div>
+
+  <div class="card">
+    <div class="card-title purple">Self-Provisioning Projects</div>
+    <p>Create a new product in the platform UI → agent scaffolds from templates, provisions Doppler project, creates Neon database, sets up Vercel project, wires CI/CD, runs conformity checks, and files a PR with the bootstrapped repo. Passes all checks before a human writes a line of code.</p>
+  </div>
+
+  <div class="card">
+    <div class="card-title purple">Cost-Aware Operations</div>
+    <p>Monitoring agents watch spend across the estate. Free tier approaching limit? Agent flags it. A project could be cheaper on a different stack? Agent models the impact and proposes a migration plan. Budget exceeded on a task? Hard stop, notify, explain.</p>
+  </div>
+
+  <div class="card">
+    <div class="card-title purple">Agents Maintaining Agents</div>
+    <p>Agents upgrade their own tooling — Claude Code versions, container images, CLAUDE.md files refined based on what produces the best results. The platform learns from agent performance data: which prompts, which context, which constraints lead to the best outcomes.</p>
+  </div>
+
+  <div class="diagram-container">
+    <pre class="mermaid">
+%%{init: {'theme': 'dark', 'themeVariables': { 'fontSize': '13px'}}}%%
+graph TB
+    subgraph AUTONOMOUS["Autonomous Estate"]
+        direction TB
+        DETECT["Detect<br/>conformity gap / new version /<br/>issue labeled / cost anomaly"]
+        PLAN["Plan<br/>agent decomposes into tasks"]
+        EXECUTE["Execute<br/>agents work in parallel"]
+        VERIFY["Verify<br/>tests, conformity checks, build"]
+        PROPOSE["Propose<br/>PR + summary for human review"]
+        APPROVE["Human approves or adjusts"]
+    end
+
+    DETECT --> PLAN
+    PLAN --> EXECUTE
+    EXECUTE --> VERIFY
+    VERIFY --> PROPOSE
+    PROPOSE --> APPROVE
+    APPROVE -.->|"feedback loop"| DETECT
+
+    style AUTONOMOUS fill:#18181b,stroke:#a78bfa,color:#fafafa
+    style APPROVE fill:#1e3a5f,stroke:#3b82f6,color:#fafafa
+    </pre>
+  </div>
+
+  <div class="callout info"><strong>The human role shifts:</strong> from writing code and managing infrastructure to <strong>reviewing proposals, setting direction, and adjusting constraints</strong>. The platform encodes your intent. Agents execute. You approve.</div>
+</section>
+
+<!-- ============================================================ -->
+<section id="demos">
+  <h2>Demos</h2>
+
+  <div class="demo-box">
+    <h4>Demo 1 — Estate Conformity Check</h4>
+    <p>Run <code>./checks/check-estate.sh</code> in the platform repo. Shows real-time conformity status across all projects with colour-coded pass/fail/divergence output.</p>
+  </div>
+
+  <div class="demo-box">
+    <h4>Demo 2 — Golden Path Walkthrough</h4>
+    <p>Open <code>products/last-person-standing.yaml</code>. Walk through each choice and how it maps to the decision matrices in <code>choices/</code>. Show zero divergences.</p>
+  </div>
+
+  <div class="demo-box">
+    <h4>Demo 3 — Dispatch a Task on Interlude</h4>
+    <p>Open <a href="https://interludes.co.uk">interludes.co.uk</a> on mobile. Create a task against a repo. Watch the agent stream output in the chat UI. Send a follow-up message. Show the live preview subdomain.</p>
+  </div>
+
+  <div class="demo-box">
+    <h4>Demo 4 — Agent Context in Action</h4>
+    <p>SSH into the VPS. <code>docker exec</code> into a running agent container. Show <code>/workspace/platform/</code> is mounted. Show the agent's <code>CLAUDE.md</code> pointing to platform standards.</p>
+  </div>
+
+  <div class="demo-box">
+    <h4>Demo 5 — GitHub Issue → Task (Phase 3)</h4>
+    <p>Label a GitHub issue with <code>interlude</code>. Watch the webhook fire, task appear in Interlude, agent start working, and draft PR get created. <em>(If Phase 3 is ready.)</em></p>
+  </div>
+</section>
+
+<hr>
+<p style="text-align: center; color: var(--text-dim); font-size: 13px; padding: 24px 0;">
+  Built with Claude &middot; Platform &amp; Interlude &middot; March 2026
+</p>
+
+</main>
+
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'dark',
+    themeVariables: {
+      darkMode: true,
+      background: '#18181b',
+      primaryColor: '#1e3a5f',
+      primaryTextColor: '#fafafa',
+      primaryBorderColor: '#3b82f6',
+      lineColor: '#71717a',
+      secondaryColor: '#27272a',
+      tertiaryColor: '#18181b',
+      fontSize: '14px',
+      fontFamily: '-apple-system, BlinkMacSystemFont, Segoe UI, system-ui, sans-serif'
+    },
+    securityLevel: 'loose',
+    flowchart: { curve: 'basis', padding: 16 },
+    sequence: { mirrorActors: false, messageMargin: 40 }
+  });
+
+  // Active nav tracking
+  const sections = document.querySelectorAll('section[id]');
+  const navLinks = document.querySelectorAll('nav a');
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        navLinks.forEach(l => l.classList.remove('active'));
+        const link = document.querySelector(`nav a[href="#${entry.target.id}"]`);
+        if (link) link.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-20% 0px -70% 0px' });
+  sections.forEach(s => observer.observe(s));
+</script>
+
+</body>
+</html>

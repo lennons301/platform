@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Building with Claude — 10 min talk</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/reveal.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/theme/black.css">
+<style>
+  :root {
+    --r-background-color: #09090b;
+    --r-main-font: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    --r-main-font-size: 32px;
+    --r-heading-font: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    --r-heading-color: #fafafa;
+    --r-heading-letter-spacing: -0.02em;
+    --r-main-color: #a1a1aa;
+    --r-link-color: #3b82f6;
+    --r-code-font: 'SF Mono', 'Cascadia Code', 'Fira Code', monospace;
+    --r-selection-background-color: #3b82f6;
+  }
+
+  .reveal { font-weight: 400; }
+  .reveal h1 { font-size: 2.2em; font-weight: 700; }
+  .reveal h2 { font-size: 1.5em; font-weight: 600; border-bottom: 2px solid #27272a; padding-bottom: 0.3em; margin-bottom: 0.6em; }
+  .reveal h3 { font-size: 1.1em; font-weight: 600; color: #fafafa; }
+  .reveal strong { color: #fafafa; }
+  .reveal em { color: #71717a; font-style: normal; }
+
+  .reveal pre {
+    background: #18181b;
+    border: 1px solid #27272a;
+    border-radius: 8px;
+    padding: 16px;
+    font-size: 0.48em;
+    width: 100%;
+    box-shadow: none;
+  }
+  .reveal code { font-family: var(--r-code-font); }
+  .reveal pre code { line-height: 1.6; max-height: 500px; }
+
+  .reveal .subtitle { font-size: 0.6em; color: #71717a; margin-top: 0.5em; }
+  .reveal .chapter { font-size: 0.45em; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 0.6em; }
+  .reveal .chapter.one { color: #22c55e; }
+  .reveal .chapter.two { color: #3b82f6; }
+  .reveal .chapter.three { color: #ef4444; }
+  .reveal .chapter.four { color: #a78bfa; }
+
+  .box {
+    background: #18181b;
+    border: 1px solid #27272a;
+    border-radius: 10px;
+    padding: 20px 24px;
+    text-align: left;
+    margin: 8px 0;
+  }
+  .box.blue { border-color: #1e3a5f; }
+  .box.green { border-color: #14532d; }
+  .box.red { border-color: #450a0a; }
+  .box.yellow { border-color: #422006; }
+  .box.purple { border-color: #3b0764; }
+
+  .box-title {
+    font-size: 0.55em;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 8px;
+  }
+  .box-title.blue { color: #3b82f6; }
+  .box-title.green { color: #22c55e; }
+  .box-title.red { color: #ef4444; }
+  .box-title.yellow { color: #eab308; }
+  .box-title.purple { color: #a78bfa; }
+
+  .box p, .box li { font-size: 0.55em; line-height: 1.5; color: #a1a1aa; }
+
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+
+  .stat-value { font-size: 2em; font-weight: 700; color: #fafafa; }
+  .stat-label { font-size: 0.45em; color: #71717a; }
+
+  .reveal table {
+    font-size: 0.5em;
+    border-collapse: collapse;
+    width: 100%;
+    margin: 16px 0;
+  }
+  .reveal table th {
+    font-size: 0.85em;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #71717a;
+    font-weight: 600;
+    border-bottom: 1px solid #3f3f46;
+    padding: 8px 12px;
+    text-align: left;
+  }
+  .reveal table td {
+    padding: 8px 12px;
+    border-bottom: 1px solid #27272a;
+    color: #a1a1aa;
+    text-align: left;
+  }
+
+  .pass { color: #22c55e; }
+  .fail { color: #ef4444; }
+  .divg { color: #a78bfa; }
+
+  .demo-label {
+    font-size: 0.5em;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #3b82f6;
+    margin-bottom: 0.3em;
+  }
+
+  .reveal .slide-number { font-size: 14px; color: #71717a; }
+
+  /* Diagrams */
+  .diagram {
+    background: #18181b;
+    border: 1px solid #27272a;
+    border-radius: 10px;
+    padding: 28px 24px;
+    margin: 16px 0;
+  }
+
+  .arch {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    align-items: center;
+  }
+  .arch-row {
+    display: flex;
+    gap: 12px;
+    align-items: stretch;
+    justify-content: center;
+  }
+  .arch-box {
+    padding: 10px 18px;
+    border-radius: 8px;
+    font-size: 0.4em;
+    font-weight: 500;
+    text-align: center;
+    border: 1px solid #3f3f46;
+    background: #27272a;
+    color: #e4e4e7;
+    min-width: 100px;
+  }
+  .arch-box.blue { background: #1e3a5f; border-color: #3b82f6; color: #93c5fd; }
+  .arch-box.green { background: #14532d; border-color: #22c55e; color: #86efac; }
+  .arch-box.purple { background: #3b0764; border-color: #a78bfa; color: #c4b5fd; }
+  .arch-box.dim { background: #18181b; border-color: #27272a; color: #71717a; }
+  .arch-group {
+    border: 1px solid #3f3f46;
+    border-radius: 10px;
+    padding: 14px;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    position: relative;
+  }
+  .arch-group.blue { border-color: #2563eb; }
+  .arch-group.green { border-color: #16a34a; }
+  .arch-group.purple { border-color: #7c3aed; }
+  .arch-group-label {
+    position: absolute;
+    top: -10px;
+    left: 14px;
+    font-size: 0.32em;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 0 6px;
+    background: #18181b;
+  }
+  .arch-group-label.blue { color: #3b82f6; }
+  .arch-group-label.green { color: #22c55e; }
+  .arch-group-label.purple { color: #a78bfa; }
+  .arch-arrow { color: #52525b; font-size: 0.45em; text-align: center; }
+
+  .flow-h {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+  }
+  .flow-h .node {
+    padding: 10px 16px;
+    border-radius: 8px;
+    font-size: 0.42em;
+    font-weight: 500;
+    text-align: center;
+    white-space: nowrap;
+    background: #27272a;
+    color: #e4e4e7;
+    border: 1px solid #3f3f46;
+  }
+  .flow-h .arrow { font-size: 0.45em; color: #52525b; padding: 0 6px; flex-shrink: 0; }
+  .flow-h .node.blue { background: #1e3a5f; border-color: #3b82f6; color: #93c5fd; }
+  .flow-h .node.green { background: #14532d; border-color: #22c55e; color: #86efac; }
+  .flow-h .node.red { background: #450a0a; border-color: #ef4444; color: #fca5a5; }
+  .flow-h .node.purple { background: #3b0764; border-color: #a78bfa; color: #c4b5fd; }
+
+  .flow-v {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+  }
+  .flow-v .node {
+    padding: 10px 24px;
+    border-radius: 8px;
+    font-size: 0.45em;
+    font-weight: 500;
+    text-align: center;
+    background: #27272a;
+    color: #e4e4e7;
+    border: 1px solid #3f3f46;
+    min-width: 280px;
+  }
+  .flow-v .arrow { font-size: 0.5em; color: #52525b; padding: 4px 0; }
+  .flow-v .node.blue { background: #1e3a5f; border-color: #3b82f6; color: #93c5fd; }
+  .flow-v .node.green { background: #14532d; border-color: #22c55e; color: #86efac; }
+  .flow-v .node.red { background: #450a0a; border-color: #ef4444; color: #fca5a5; }
+  .flow-v .node.purple { background: #3b0764; border-color: #a78bfa; color: #c4b5fd; }
+
+  /* Problem list */
+  .problem-list {
+    text-align: left;
+    font-size: 0.55em;
+    line-height: 1.8;
+  }
+  .problem-list .issue {
+    padding: 8px 0;
+    border-bottom: 1px solid #1e1e22;
+  }
+  .problem-list .label {
+    color: #ef4444;
+    font-weight: 600;
+    font-size: 0.85em;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .problem-list .desc { color: #a1a1aa; margin-top: 2px; }
+</style>
+</head>
+<body>
+
+<div class="reveal">
+<div class="slides">
+
+<!-- ==================== TITLE ==================== -->
+<section>
+  <h1>Building with Claude</h1>
+  <p class="subtitle">Side projects, AI agents, and the infrastructure that emerged</p>
+  <aside class="notes">
+    Quick walkthrough of what I've been building with my Claude subscription. Started as one app, ended up building a platform. ~10 mins.
+  </aside>
+</section>
+
+<!-- ==================== 1. LEMONS ==================== -->
+<section>
+  <div class="chapter one">Chapter 1</div>
+  <h2>Lemons</h2>
+  <p style="font-size: 0.6em;"><strong>Lemons</strong> — household management (recipes, meal planning, shopping lists)</p>
+  <div class="diagram">
+    <div class="flow-h">
+      <div class="node green">Next.js 16</div>
+      <div class="arrow">→</div>
+      <div class="node">Supabase (DB + Auth)</div>
+      <div class="arrow">→</div>
+      <div class="node blue">Vercel (deploy)</div>
+    </div>
+    <p style="font-size: 0.38em; color: #52525b; text-align: center; margin-top: 10px;">GitHub Actions CI/CD · shadcn/ui · Tailwind · Claude API for recipe image extraction</p>
+  </div>
+  <p style="font-size: 0.55em;">Straightforward full-stack app. Claude helped build most of it through conversational development — describe what you want, iterate on the output.</p>
+  <aside class="notes">
+    DEMO: Quick show of Lemons UI if time. The point is this was the starting point — one app, simple architecture, Claude as a coding assistant in the terminal.
+  </aside>
+</section>
+
+<!-- ==================== 2. INTERLUDE MOTIVATION ==================== -->
+<section>
+  <div class="chapter two">Chapter 2</div>
+  <h2>Interlude — Motivation</h2>
+  <p style="font-size: 0.6em;">Wanted to dispatch development tasks <strong>from my phone</strong>.</p>
+  <p style="font-size: 0.55em; color: #71717a;">Tools like Lovable exist but you give up control — no git history, no real containers, no custom tooling. Wanted the convenience with full ownership.</p>
+  <div class="box blue" style="margin-top: 16px;">
+    <div class="box-title blue">So I built Interlude</div>
+    <p>A self-hosted platform: describe a task → AI agent works in a Docker container → streams output to a chat UI → pushes a branch → you review the PR.</p>
+  </div>
+  <aside class="notes">
+    The key motivation: I want to be on my phone, describe what I want, and have an agent do the work. Like having a junior dev you can message anytime.
+  </aside>
+</section>
+
+<!-- ==================== 2. INTERLUDE ARCHITECTURE ==================== -->
+<section>
+  <div class="chapter two">Chapter 2</div>
+  <h2>Interlude — Architecture</h2>
+  <div class="diagram">
+    <div class="arch">
+      <div class="arch-row">
+        <div class="arch-box">User (mobile / desktop)</div>
+      </div>
+      <div class="arch-arrow">↓</div>
+      <div class="arch-row">
+        <div class="arch-box blue">Caddy — Auto-TLS + Reverse Proxy</div>
+      </div>
+      <div class="arch-arrow">↓&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;↓ *.interludes.co.uk</div>
+      <div class="arch-row">
+        <div class="arch-group blue" style="flex: 1;">
+          <div class="arch-group-label blue">Next.js 16 App</div>
+          <div class="arch-box">API + Chat UI</div>
+          <div class="arch-box">SSE Stream</div>
+          <div class="arch-box">Orchestrator</div>
+        </div>
+        <div class="arch-box" style="align-self: center;">SQLite</div>
+      </div>
+      <div class="arch-arrow">↓ Docker API</div>
+      <div class="arch-row">
+        <div class="arch-group green">
+          <div class="arch-group-label green">Agent Containers</div>
+          <div class="arch-box green">Claude Code + git</div>
+          <div class="arch-box green">Claude Code + git</div>
+        </div>
+        <div class="arch-box dim" style="align-self: center; font-size: 0.35em;">→ GitHub<br>← Live preview</div>
+      </div>
+    </div>
+  </div>
+  <p style="font-size: 0.48em; color: #71717a;">Hetzner VPS · ~€4.50/mo · Multi-turn chat · Subdomain previews with auto-TLS · $5/task budget cap</p>
+  <aside class="notes">
+    DEMO: Open interludes.co.uk on phone. Create a task. Watch the agent work. Show the live preview subdomain. This is the main demo moment.
+  </aside>
+</section>
+
+<!-- ==================== 2. INTERLUDE BLUE SKY ==================== -->
+<section>
+  <div class="chapter two">Chapter 2</div>
+  <h2>Interlude — Future Direction</h2>
+  <div class="diagram">
+    <div class="arch">
+      <div class="arch-row">
+        <div class="arch-group purple" style="padding: 16px 20px;">
+          <div class="arch-group-label purple">Control Plane UI</div>
+          <div class="arch-box purple">Estate Dashboard</div>
+          <div class="arch-box purple">Task Feed</div>
+          <div class="arch-box purple">Project Manager</div>
+        </div>
+      </div>
+      <div class="arch-arrow">↓</div>
+      <div class="arch-row">
+        <div class="arch-group green" style="padding: 16px 20px;">
+          <div class="arch-group-label green">Execution Engine</div>
+          <div class="arch-box green">Orchestrator</div>
+          <div class="arch-box green">Local + Cloud Compute</div>
+        </div>
+      </div>
+      <div class="arch-arrow">↓</div>
+      <div class="arch-row">
+        <div class="arch-group blue" style="padding: 16px 20px;">
+          <div class="arch-group-label blue">Agent Pool</div>
+          <div class="arch-box blue">Architect</div>
+          <div class="arch-box blue">Implementer</div>
+          <div class="arch-box blue">Implementer</div>
+          <div class="arch-box blue">Reviewer</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <p style="font-size: 0.5em;">Multi-agent workflows · task decomposition · parallel branches · human-in-the-loop checkpoints</p>
+  <aside class="notes">
+    Blue sky: agents that collaborate. Architect decomposes, implementers work in parallel, reviewer checks the PRs. You just approve.
+  </aside>
+</section>
+
+<!-- ==================== 3. THINGS BROKE ==================== -->
+<section>
+  <div class="chapter three">Chapter 3</div>
+  <h2>Scaling Problems</h2>
+  <p style="font-size: 0.55em; margin-bottom: 16px;">Started converting <strong>Premier League Survivor Picks</strong> (a Lovable-deployed project) and hit walls fast.</p>
+  <div class="problem-list">
+    <div class="issue">
+      <div class="label">Supabase limits</div>
+      <div class="desc">Only 2 free projects. Can't sustain environment separation (dev/stg/prd) across multiple products.</div>
+    </div>
+    <div class="issue">
+      <div class="label">Environment inconsistency</div>
+      <div class="desc">Local dev in parts, production database in parts. No clear boundary between environments.</div>
+    </div>
+    <div class="issue">
+      <div class="label">Secrets management</div>
+      <div class="desc"><code>.env.local</code> files on one laptop. Doesn't work when agents run on a VPS. Single point of failure.</div>
+    </div>
+    <div class="issue">
+      <div class="label">Version drift</div>
+      <div class="desc">Already losing track of what version of what framework is in which project and why.</div>
+    </div>
+  </div>
+  <aside class="notes">
+    This is the turning point. One app is fine. Two apps is fine. Three apps with agents developing them remotely — everything falls apart without structure.
+  </aside>
+</section>
+
+<!-- ==================== 4. PLATFORM ==================== -->
+<section>
+  <div class="chapter four">Chapter 4</div>
+  <h2>The Platform Repo</h2>
+  <p style="font-size: 0.55em; margin-bottom: 12px;">A single repo that defines what the estate should look like — consumed by both humans and agents.</p>
+  <pre><code>platform/
+├── standards/     5 principles (environments, secrets, local-dev, docs, testing)
+├── choices/       6 decision areas with matrices (db, auth, hosting, orm, secrets, ui)
+├── versions/      Target runtimes (Node 22, Next.js 16, React 19, TS 5.7)
+├── products/      Registry: each project's choices, versions, divergences
+├── checks/        Shell scripts that validate conformity
+├── templates/     Starters for new projects
+└── .github/       CI runs checks on push, creates issues for gaps</code></pre>
+  <aside class="notes">
+    Simple structure. All YAML and markdown. The key insight: this is consumed by agents too — it's mounted into every Interlude container so agents know the rules.
+  </aside>
+</section>
+
+<!-- ==================== 4. STANDARDS ==================== -->
+<section>
+  <div class="chapter four">Chapter 4</div>
+  <h2>Standards</h2>
+  <p style="font-size: 0.55em; margin-bottom: 16px;">Five tool-agnostic rules every project must follow — regardless of which database or framework is chosen.</p>
+  <div class="grid-2" style="gap: 12px;">
+    <div class="box" style="padding: 14px 18px;">
+      <div class="box-title purple" style="font-size: 0.5em;">Environments</div>
+      <p style="font-size: 0.48em;">Three isolated environments: <strong>dev</strong> (local, disposable), <strong>stg</strong> (remote, safe to reset), <strong>prd</strong> (production). Separate secrets per environment.</p>
+    </div>
+    <div class="box" style="padding: 14px 18px;">
+      <div class="box-title purple" style="font-size: 0.5em;">Secrets</div>
+      <p style="font-size: 0.48em;">Single remote provider as source of truth. Never committed, never hardcoded. <code>.env.local</code> is a cache, not canonical.</p>
+    </div>
+    <div class="box" style="padding: 14px 18px;">
+      <div class="box-title purple" style="font-size: 0.5em;">Local Development</div>
+      <p style="font-size: 0.48em;">All projects run against local Docker services. If your laptop is offline, development still works. No dependency on remote databases.</p>
+    </div>
+    <div class="box" style="padding: 14px 18px;">
+      <div class="box-title purple" style="font-size: 0.5em;">Documentation</div>
+      <p style="font-size: 0.48em;">Every repo has a <code>CLAUDE.md</code> — the primary technical reference for both humans and AI agents. Updated at the end of each phase.</p>
+    </div>
+  </div>
+  <div class="box" style="padding: 14px 18px; margin-top: 12px;">
+    <div class="box-title purple" style="font-size: 0.5em;">Testing</div>
+    <p style="font-size: 0.48em;">Automated tests running against local services. CI runs them on every PR.</p>
+  </div>
+  <aside class="notes">
+    These are the non-negotiables. They're tool-agnostic — swap Neon for Supabase and the standards still hold. The CLAUDE.md standard is the AI-specific one — every agent that touches a repo gets context automatically.
+  </aside>
+</section>
+
+<!-- ==================== 4. WHAT IT PROPOSES ==================== -->
+<section>
+  <div class="chapter four">Chapter 4</div>
+  <h2>Choices</h2>
+  <p style="font-size: 0.55em; margin-bottom: 12px;">Decision matrices with a preferred default for each area. Projects can diverge with a documented reason.</p>
+  <table>
+    <thead><tr><th>Area</th><th>Default</th><th>Why</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Database</strong></td><td>Neon (serverless Postgres)</td><td>10 free projects, local Docker for dev</td></tr>
+      <tr><td><strong>Auth</strong></td><td>Better Auth</td><td>Data in your DB, pairs with Drizzle</td></tr>
+      <tr><td><strong>ORM</strong></td><td>Drizzle</td><td>Type-safe, works locally and remotely</td></tr>
+      <tr><td><strong>Secrets</strong></td><td>Doppler</td><td>Central store, agents can access it too</td></tr>
+      <tr><td><strong>Hosting</strong></td><td>Vercel Hobby (free)</td><td>Zero-config deploys</td></tr>
+      <tr><td><strong>UI</strong></td><td>shadcn/ui + Tailwind</td><td>Source-owned components</td></tr>
+    </tbody>
+  </table>
+  <p style="font-size: 0.48em; color: #71717a; margin-top: 8px;">Total fixed infrastructure cost: <strong style="color: #fafafa;">~€4.50/mo</strong> (just the Interlude VPS). Everything else is free tier.</p>
+  <aside class="notes">
+    Each choice has a full decision matrix with alternatives. The defaults are optimised for free-tier-first — this can't cost more than just paying for hosted services.
+  </aside>
+</section>
+
+<!-- ==================== 4. CONFORMITY ==================== -->
+<section>
+  <div class="chapter four">Chapter 4</div>
+  <h2>Conformity Checks</h2>
+  <pre style="font-size: 0.42em;"><code>$ ./checks/check-estate.sh
+
+Estate Conformity Report — 2026-03-31
+═══════════════════════════════════════
+interlude:
+  secrets: <span class="divg">✓*</span> (intentional divergence)
+  versions: <span class="fail">✗</span> (drizzle-kit: unknown → 0.30)
+  environments: <span class="pass">✓</span>
+  documentation: <span class="fail">✗</span> (missing section: command)
+
+last-person-standing:
+  secrets: <span class="fail">✗</span> (no doppler.yaml found)
+  environments: <span class="pass">✓</span>
+  documentation: <span class="pass">✓</span>
+
+lemons:
+  secrets: <span class="fail">✗</span> (not yet migrated to Doppler)
+  environments: <span class="pass">✓</span>
+  documentation: <span class="pass">✓</span>
+
+═══════════════════════════════════════
+<span class="fail">6 gap(s)</span> found across 3 product(s).
+Run checks/create-issues.sh to file GitHub Issues.</code></pre>
+  <aside class="notes">
+    DEMO: Run this live in the terminal. Show the real output. Point out the intentional divergence (purple tick) vs actual gaps (red cross). CI runs this on every push.
+  </aside>
+</section>
+
+<!-- ==================== 4. THE LOOP ==================== -->
+<section>
+  <div class="chapter four">Chapter 4</div>
+  <h2>The Intended Loop</h2>
+  <div class="diagram">
+    <div class="flow-v">
+      <div class="node purple">Platform defines standards + choices</div>
+      <div class="arrow">↓</div>
+      <div class="node">CI runs conformity checks across all repos</div>
+      <div class="arrow">↓</div>
+      <div class="node red">Gaps auto-create GitHub Issues</div>
+      <div class="arrow">↓</div>
+      <div class="node green">Agents fix via Interlude (platform context mounted)</div>
+      <div class="arrow">↓</div>
+      <div class="node blue">PR merged → checks re-run → estate converges</div>
+    </div>
+  </div>
+  <p style="font-size: 0.5em; margin-top: 12px;">Today: the loop is partly manual. Next: agents pick up conformity issues automatically.</p>
+  <aside class="notes">
+    This is where it all connects. Platform is the brain, Interlude is the hands. Agents inherit the platform context so they produce conformant code by default. The goal is to close this loop fully — gap detected, agent fixes it, PR filed, no human needed for routine fixes.
+  </aside>
+</section>
+
+<!-- ==================== END ==================== -->
+<section>
+  <h1>Questions?</h1>
+  <p class="subtitle" style="margin-top: 24px;">
+    <strong style="color: #22c55e;">lemons</strong> — the app&emsp;
+    <strong style="color: #3b82f6;">interlude</strong> — the hands&emsp;
+    <strong style="color: #a78bfa;">platform</strong> — the brain
+  </p>
+  <p class="subtitle">Built with Claude · March 2026</p>
+</section>
+
+</div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/reveal.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5/plugin/notes/notes.js"></script>
+<script>
+  Reveal.initialize({
+    hash: true,
+    slideNumber: 'c/t',
+    width: 1280,
+    height: 720,
+    margin: 0.08,
+    transition: 'fade',
+    transitionSpeed: 'fast',
+    plugins: [RevealNotes]
+  });
+</script>
+
+</body>
+</html>

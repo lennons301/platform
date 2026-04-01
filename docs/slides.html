@@ -1,0 +1,923 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Platform & Interlude — Slides</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/reveal.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/theme/black.css">
+<style>
+  :root {
+    --r-background-color: #09090b;
+    --r-main-font: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    --r-main-font-size: 32px;
+    --r-heading-font: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    --r-heading-color: #fafafa;
+    --r-heading-letter-spacing: -0.02em;
+    --r-main-color: #a1a1aa;
+    --r-link-color: #3b82f6;
+    --r-code-font: 'SF Mono', 'Cascadia Code', 'Fira Code', monospace;
+    --r-selection-background-color: #3b82f6;
+  }
+
+  .reveal { font-weight: 400; }
+  .reveal h1 { font-size: 2.2em; font-weight: 700; }
+  .reveal h2 { font-size: 1.6em; font-weight: 600; border-bottom: 2px solid #27272a; padding-bottom: 0.3em; margin-bottom: 0.6em; }
+  .reveal h3 { font-size: 1.2em; font-weight: 600; color: #fafafa; }
+  .reveal strong { color: #fafafa; }
+  .reveal em { color: #71717a; font-style: normal; }
+
+  .reveal pre {
+    background: #18181b;
+    border: 1px solid #27272a;
+    border-radius: 8px;
+    padding: 16px;
+    font-size: 0.48em;
+    width: 100%;
+    box-shadow: none;
+  }
+  .reveal code { font-family: var(--r-code-font); }
+  .reveal pre code { line-height: 1.6; max-height: 500px; }
+
+  .reveal .subtitle { font-size: 0.65em; color: #71717a; margin-top: 0.5em; }
+
+  /* Cards / boxes */
+  .box {
+    background: #18181b;
+    border: 1px solid #27272a;
+    border-radius: 10px;
+    padding: 20px 24px;
+    text-align: left;
+    margin: 8px 0;
+  }
+  .box.blue { border-color: #1e3a5f; }
+  .box.green { border-color: #14532d; }
+  .box.red { border-color: #450a0a; }
+  .box.yellow { border-color: #422006; }
+  .box.purple { border-color: #3b0764; }
+
+  .box-title {
+    font-size: 0.55em;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 8px;
+  }
+  .box-title.blue { color: #3b82f6; }
+  .box-title.green { color: #22c55e; }
+  .box-title.red { color: #ef4444; }
+  .box-title.yellow { color: #eab308; }
+  .box-title.purple { color: #a78bfa; }
+
+  .box p, .box li { font-size: 0.55em; line-height: 1.5; color: #a1a1aa; }
+
+  /* Grids */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+
+  /* Stats */
+  .stat-value { font-size: 2em; font-weight: 700; color: #fafafa; }
+  .stat-label { font-size: 0.45em; color: #71717a; }
+
+  /* Badges */
+  .badge {
+    display: inline-block;
+    font-size: 0.4em;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 99px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    vertical-align: middle;
+  }
+  .badge.green { background: #14532d; color: #22c55e; }
+  .badge.blue { background: #1e3a5f; color: #3b82f6; }
+  .badge.dim { background: #27272a; color: #71717a; }
+
+  /* Tables */
+  .reveal table {
+    font-size: 0.5em;
+    border-collapse: collapse;
+    width: 100%;
+    margin: 16px 0;
+  }
+  .reveal table th {
+    font-size: 0.85em;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #71717a;
+    font-weight: 600;
+    border-bottom: 1px solid #3f3f46;
+    padding: 8px 12px;
+    text-align: left;
+  }
+  .reveal table td {
+    padding: 8px 12px;
+    border-bottom: 1px solid #27272a;
+    color: #a1a1aa;
+    text-align: left;
+  }
+
+  /* Conformity output */
+  .pass { color: #22c55e; }
+  .fail { color: #ef4444; }
+  .divg { color: #a78bfa; }
+
+  /* Demo slide */
+  .demo-label {
+    font-size: 0.5em;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #3b82f6;
+    margin-bottom: 0.3em;
+  }
+
+  .reveal .slide-number { font-size: 14px; color: #71717a; }
+
+  /* ===== CSS Diagrams ===== */
+  .diagram {
+    background: #18181b;
+    border: 1px solid #27272a;
+    border-radius: 10px;
+    padding: 28px 24px;
+    margin: 16px 0;
+  }
+
+  /* Flow (horizontal) */
+  .flow-h {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    flex-wrap: nowrap;
+  }
+  .flow-h .node {
+    padding: 10px 16px;
+    border-radius: 8px;
+    font-size: 0.42em;
+    font-weight: 500;
+    text-align: center;
+    white-space: nowrap;
+    background: #27272a;
+    color: #e4e4e7;
+    border: 1px solid #3f3f46;
+  }
+  .flow-h .arrow {
+    font-size: 0.45em;
+    color: #52525b;
+    padding: 0 6px;
+    flex-shrink: 0;
+  }
+  .flow-h .node.blue { background: #1e3a5f; border-color: #3b82f6; color: #93c5fd; }
+  .flow-h .node.green { background: #14532d; border-color: #22c55e; color: #86efac; }
+  .flow-h .node.red { background: #450a0a; border-color: #ef4444; color: #fca5a5; }
+  .flow-h .node.purple { background: #3b0764; border-color: #a78bfa; color: #c4b5fd; }
+  .flow-h .node.diamond {
+    background: #27272a;
+    border-color: #71717a;
+    transform: none;
+    font-style: italic;
+  }
+  .flow-h .branch { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .flow-h .branch-label { font-size: 0.35em; color: #71717a; }
+
+  /* Flow (vertical) */
+  .flow-v {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+  }
+  .flow-v .node {
+    padding: 10px 24px;
+    border-radius: 8px;
+    font-size: 0.45em;
+    font-weight: 500;
+    text-align: center;
+    background: #27272a;
+    color: #e4e4e7;
+    border: 1px solid #3f3f46;
+    min-width: 260px;
+  }
+  .flow-v .arrow {
+    font-size: 0.5em;
+    color: #52525b;
+    padding: 4px 0;
+  }
+  .flow-v .node.blue { background: #1e3a5f; border-color: #3b82f6; color: #93c5fd; }
+  .flow-v .node.green { background: #14532d; border-color: #22c55e; color: #86efac; }
+  .flow-v .node.red { background: #450a0a; border-color: #ef4444; color: #fca5a5; }
+  .flow-v .node.purple { background: #3b0764; border-color: #a78bfa; color: #c4b5fd; }
+
+  .flow-v .split {
+    display: flex;
+    gap: 40px;
+    align-items: flex-start;
+  }
+  .flow-v .split-arm {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+  }
+  .flow-v .split-label { font-size: 0.35em; color: #71717a; margin-bottom: 4px; }
+
+  /* Architecture diagram */
+  .arch {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    align-items: center;
+  }
+  .arch-row {
+    display: flex;
+    gap: 12px;
+    align-items: stretch;
+    justify-content: center;
+  }
+  .arch-box {
+    padding: 10px 18px;
+    border-radius: 8px;
+    font-size: 0.4em;
+    font-weight: 500;
+    text-align: center;
+    border: 1px solid #3f3f46;
+    background: #27272a;
+    color: #e4e4e7;
+    min-width: 100px;
+  }
+  .arch-box.blue { background: #1e3a5f; border-color: #3b82f6; color: #93c5fd; }
+  .arch-box.green { background: #14532d; border-color: #22c55e; color: #86efac; }
+  .arch-box.purple { background: #3b0764; border-color: #a78bfa; color: #c4b5fd; }
+  .arch-box.dim { background: #18181b; border-color: #27272a; color: #71717a; }
+  .arch-group {
+    border: 1px solid #3f3f46;
+    border-radius: 10px;
+    padding: 14px;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    position: relative;
+  }
+  .arch-group.blue { border-color: #2563eb; }
+  .arch-group.green { border-color: #16a34a; }
+  .arch-group.purple { border-color: #7c3aed; }
+  .arch-group-label {
+    position: absolute;
+    top: -10px;
+    left: 14px;
+    font-size: 0.32em;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 0 6px;
+    background: #18181b;
+  }
+  .arch-group-label.blue { color: #3b82f6; }
+  .arch-group-label.green { color: #22c55e; }
+  .arch-group-label.purple { color: #a78bfa; }
+  .arch-arrow { color: #52525b; font-size: 0.45em; text-align: center; }
+  .arch-note { font-size: 0.32em; color: #52525b; font-style: italic; text-align: center; margin-top: 2px; }
+
+  /* Sequence diagram */
+  .seq { width: 100%; }
+  .seq-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 3px 0;
+    font-size: 0.4em;
+  }
+  .seq-actor {
+    width: 90px;
+    text-align: right;
+    font-weight: 600;
+    color: #71717a;
+    flex-shrink: 0;
+  }
+  .seq-actor.blue { color: #3b82f6; }
+  .seq-actor.green { color: #22c55e; }
+  .seq-msg {
+    flex: 1;
+    padding: 5px 12px;
+    border-radius: 4px;
+    background: #1e1e22;
+    color: #a1a1aa;
+    border-left: 3px solid #3f3f46;
+  }
+  .seq-msg.blue { border-left-color: #3b82f6; }
+  .seq-msg.green { border-left-color: #22c55e; }
+  .seq-msg.purple { border-left-color: #a78bfa; }
+  .seq-dir {
+    width: 24px;
+    text-align: center;
+    color: #52525b;
+    flex-shrink: 0;
+  }
+  .seq-divider {
+    font-size: 0.35em;
+    color: #52525b;
+    text-align: center;
+    padding: 4px 0;
+    border-top: 1px dashed #27272a;
+    margin: 4px 0;
+  }
+
+  /* Loop indicator */
+  .loop-wrap {
+    border: 1px dashed #3f3f46;
+    border-radius: 6px;
+    padding: 6px 8px;
+    margin: 4px 0;
+    position: relative;
+  }
+  .loop-label {
+    position: absolute;
+    top: -8px;
+    left: 10px;
+    font-size: 0.32em;
+    color: #71717a;
+    background: #18181b;
+    padding: 0 4px;
+  }
+</style>
+</head>
+<body>
+
+<div class="reveal">
+<div class="slides">
+
+<!-- ==================== TITLE ==================== -->
+<section>
+  <h1>Platform &amp; Interlude</h1>
+  <p class="subtitle">AI-assisted estate management for a portfolio of side projects</p>
+  <div class="grid-3" style="margin-top: 48px;">
+    <div><div class="stat-value">3</div><div class="stat-label">Active projects</div></div>
+    <div><div class="stat-value">1</div><div class="stat-label">Engineer</div></div>
+    <div><div class="stat-value">6</div><div class="stat-label">Decision areas governed</div></div>
+  </div>
+  <aside class="notes">
+    I've been using Claude (under my subscription) to help build and manage a portfolio of side projects. This is a walkthrough of the system I've put together — part standards framework, part AI agent platform.
+  </aside>
+</section>
+
+<!-- ==================== THE PROBLEM ==================== -->
+<section>
+  <h2>The Problem</h2>
+  <div class="grid-3">
+    <div class="box red">
+      <div class="box-title red">Consistency</div>
+      <p>Without discipline, tech choices drift. Every project becomes its own snowflake.</p>
+    </div>
+    <div class="box yellow">
+      <div class="box-title yellow">Cost</div>
+      <p>This can't cost more than just paying for managed services. Free-tier-first, always.</p>
+    </div>
+    <div class="box blue">
+      <div class="box-title blue">Context</div>
+      <p>AI agents start from zero every session. Without shared truth, you re-explain everything.</p>
+    </div>
+  </div>
+  <aside class="notes">
+    Three pressures that compound over time. Consistency is the obvious one — but cost matters because this is side projects, not a company. And context is the AI-specific one: agents are powerful but amnesiac.
+  </aside>
+</section>
+
+<!-- ==================== TWO-PART SOLUTION ==================== -->
+<section>
+  <h2>The Solution</h2>
+  <div class="grid-2">
+    <div class="box blue">
+      <div class="box-title blue">Platform — The Brain</div>
+      <p>Standards, choices, version targets, conformity checks. A single source of truth consumed by both humans and AI agents.</p>
+    </div>
+    <div class="box green">
+      <div class="box-title green">Interlude — The Hands</div>
+      <p>Dispatch tasks to AI agents from your phone. Watch them work. Get PRs back. Agents inherit platform context automatically.</p>
+    </div>
+  </div>
+  <aside class="notes">
+    Two repos that work together. Platform defines what the estate should look like. Interlude gives agents the ability to work on it. Between them, they aim to make a one-person operation feel like a team.
+  </aside>
+</section>
+
+<!-- ==================== THE ESTATE ==================== -->
+<section>
+  <h2>The Estate</h2>
+  <table>
+    <thead><tr><th>Project</th><th>Category</th><th>Stack</th><th>Hosting</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Last Person Standing</strong></td><td>Product</td><td>Neon, Better Auth, Drizzle, Doppler</td><td>Vercel</td></tr>
+      <tr><td><strong>Lemons</strong></td><td>Product</td><td>Supabase, Supabase Auth</td><td>Vercel</td></tr>
+      <tr><td><strong>Interlude</strong></td><td>Infrastructure</td><td>SQLite, Drizzle, env-file</td><td>Hetzner VPS</td></tr>
+      <tr><td style="color:#52525b">Premier League Survivor Picks</td><td style="color:#52525b">Product</td><td style="color:#52525b">Supabase (legacy)</td><td style="color:#52525b">Vercel</td></tr>
+    </tbody>
+  </table>
+  <p style="font-size: 0.55em; margin-top: 16px;">All active projects: <strong>Next.js 16 · React 19 · Node 22 · TypeScript 5.7 · shadcn/ui + Tailwind</strong></p>
+  <aside class="notes">
+    Four projects, three active plus one archived legacy that's being replaced. Common stack across all of them — that's the consistency the platform enforces.
+  </aside>
+</section>
+
+<!-- ==================== PLATFORM OVERVIEW ==================== -->
+<section>
+  <h2>Platform — The Brain</h2>
+  <pre><code>platform/
+├── standards/     5 principles (tool-agnostic rules)
+├── choices/       6 decision areas (specific tools)
+├── versions/      Target runtime & framework versions
+├── products/      Registry of every managed project
+├── checks/        Shell scripts that validate conformity
+├── templates/     Starters for new projects
+└── .github/       CI that runs checks on push</code></pre>
+  <aside class="notes">
+    Simple structure. Standards are the "why", choices are the "what", versions are the "how new". Products is the registry. Checks enforce it all. Templates bootstrap new projects.
+  </aside>
+</section>
+
+<!-- ==================== STANDARDS ==================== -->
+<section>
+  <h2>Standards</h2>
+  <p style="font-size: 0.6em; margin-bottom: 20px;">Five tool-agnostic principles — these don't change when you swap a database.</p>
+  <div class="grid-2">
+    <div class="box"><div class="box-title blue">Environments</div><p>Exactly 3: dev, stg, prd. Isolated. Prod creds never in dev.</p></div>
+    <div class="box"><div class="box-title blue">Secrets</div><p>Single remote provider. Never committed. Per-environment.</p></div>
+    <div class="box"><div class="box-title blue">Local Development</div><p>Docker services. Offline-capable. No remote dependencies.</p></div>
+    <div class="box"><div class="box-title blue">Documentation</div><p>CLAUDE.md in every repo. Updated each phase. Platform context pointer.</p></div>
+  </div>
+  <div class="box" style="margin-top: 16px;"><div class="box-title blue">Testing</div><p>Automated tests. Local services. CI on every PR.</p></div>
+  <aside class="notes">
+    These are the non-negotiables. Tool-agnostic means if we decide to move from Neon to Supabase, the standards still hold. The CLAUDE.md standard is the AI-specific one — it ensures every agent has context.
+  </aside>
+</section>
+
+<!-- ==================== CHOICES ==================== -->
+<section>
+  <h2>Choices</h2>
+  <p style="font-size: 0.55em; margin-bottom: 16px;">Decision matrices, not mandates. Projects pick from evaluated options. Reviewed quarterly.</p>
+  <table>
+    <thead><tr><th>Area</th><th>Default</th><th>Alternatives</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Database</strong></td><td>Neon (serverless Postgres)</td><td>Supabase, SQLite</td></tr>
+      <tr><td><strong>Auth</strong></td><td>Better Auth (data in your DB)</td><td>Supabase Auth, Clerk, Auth.js</td></tr>
+      <tr><td><strong>Secrets</strong></td><td>Doppler</td><td>env-file (with documented divergence)</td></tr>
+      <tr><td><strong>Hosting</strong></td><td>Vercel Hobby</td><td>Self-hosted Hetzner</td></tr>
+      <tr><td><strong>ORM</strong></td><td>Drizzle</td><td>Supabase Client</td></tr>
+      <tr><td><strong>UI</strong></td><td>shadcn/ui + Tailwind</td><td>—</td></tr>
+    </tbody>
+  </table>
+  <aside class="notes">
+    Every choice comes with a decision matrix that documents the tradeoffs. Free-tier-first is a key criterion. The defaults represent the modern golden path — Neon + Better Auth + Drizzle is the recommended stack for new projects.
+  </aside>
+</section>
+
+<!-- ==================== GOLDEN PATH ==================== -->
+<section>
+  <h2>Golden Path — Last Person Standing</h2>
+  <pre><code class="yaml">name: last-person-standing
+description: Premier League Survivor Picks (Next.js 16 rewrite)
+status: active
+
+choices:
+  hosting:  vercel-hobby      # Default
+  database: neon              # Default
+  auth:     better-auth       # Default
+  orm:      drizzle           # Default
+  secrets:  doppler           # Default
+
+divergences: []               # ← Fully conformant</code></pre>
+  <aside class="notes">
+    This is what a fully conformant project looks like. Zero divergences. Every choice is the default. This is the reference implementation — if you're starting a new project, it should look like this.
+  </aside>
+</section>
+
+<!-- ==================== DIVERGENCES ==================== -->
+<section>
+  <h2>Intentional Divergences</h2>
+  <pre><code class="yaml"># products/interlude.yaml
+divergences:
+  - standard: hosting
+    choice: self-hosted-hetzner
+    reason: >
+      Needs Docker daemon access and persistent
+      containers. Serverless is incompatible.
+
+  - standard: secrets
+    choice: env-file
+    reason: >
+      Single VPS. Doppler adds complexity with
+      no benefit for one deploy target.</code></pre>
+  <p style="font-size: 0.55em; margin-top: 16px;">Divergences are <span style="color: #a78bfa;">✓* acknowledged</span>, not <span style="color: #ef4444;">✗ gaps</span>. The system handles exceptions with documentation, not rigidity.</p>
+  <aside class="notes">
+    This is important — the system isn't rigid. If a project has a good reason to diverge, it documents why and the conformity checks see it as intentional, not broken.
+  </aside>
+</section>
+
+<!-- ==================== CONFORMITY CHECKS ==================== -->
+<section>
+  <h2>Conformity Checks</h2>
+  <pre style="font-size: 0.42em;"><code>Estate Conformity Report — 2026-03-31
+═══════════════════════════════════════
+interlude:
+  secrets: <span class="divg">✓*</span> (intentional divergence)
+  versions: <span class="fail">✗</span> (drizzle-kit: unknown → 0.30)
+  environments: <span class="pass">✓</span>
+  documentation: <span class="fail">✗</span> (missing section: command)
+
+last-person-standing:
+  secrets: <span class="fail">✗</span> (no doppler.yaml found)
+  environments: <span class="pass">✓</span>
+  documentation: <span class="pass">✓</span>
+
+lemons:
+  secrets: <span class="fail">✗</span> (not yet migrated to Doppler)
+  environments: <span class="pass">✓</span>
+  documentation: <span class="pass">✓</span>
+
+═══════════════════════════════════════
+<span class="fail">6 gap(s)</span> found across 3 product(s).
+Run checks/create-issues.sh to file GitHub Issues.</code></pre>
+  <aside class="notes">
+    DEMO: Run this live. ./checks/check-estate.sh. Real output. CI runs this on every push to platform/main and auto-creates GitHub issues for gaps.
+  </aside>
+</section>
+
+<!-- ==================== CI PIPELINE ==================== -->
+<section>
+  <h2>CI — Auto-Created Issues</h2>
+  <div class="diagram">
+    <div class="flow-h">
+      <div class="node blue">Push to main</div>
+      <div class="arrow">→</div>
+      <div class="node">Clone product repos</div>
+      <div class="arrow">→</div>
+      <div class="node">Run check-estate.sh</div>
+      <div class="arrow">→</div>
+      <div class="branch">
+        <div class="node diamond">Gaps?</div>
+        <div style="display: flex; gap: 24px; margin-top: 8px;">
+          <div style="text-align: center;">
+            <div class="branch-label">yes</div>
+            <div class="node red">Create GitHub Issues</div>
+          </div>
+          <div style="text-align: center;">
+            <div class="branch-label">no</div>
+            <div class="node green">All clear</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p style="font-size: 0.4em; color: #52525b; text-align: center; margin-top: 12px;">Issues feed back into agents or humans for remediation → checks re-run on next push</p>
+  </div>
+  <aside class="notes">
+    GitHub Actions workflow. Clones all non-archived product repos, runs every check, creates issues for gaps. The loop from issue back to check is where agents come in.
+  </aside>
+</section>
+
+<!-- ==================== INTERLUDE INTRO ==================== -->
+<section>
+  <h2>Interlude — The Hands</h2>
+  <div class="grid-2">
+    <div class="box green"><div class="box-title green">Dispatch from anywhere</div><p>Mobile-friendly PWA. Describe a task, agent picks it up.</p></div>
+    <div class="box green"><div class="box-title green">Real-time streaming</div><p>Watch the agent think, write code, run commands. SSE-streamed chat UI.</p></div>
+    <div class="box green"><div class="box-title green">Multi-turn conversations</div><p>Containers persist. Send follow-ups. Agent resumes with full context.</p></div>
+    <div class="box green"><div class="box-title green">Live preview</div><p>Agent starts a dev server → auto-proxied to a subdomain with TLS.</p></div>
+  </div>
+  <aside class="notes">
+    DEMO: Open interludes.co.uk on mobile. Create a task. Watch the stream. Send a follow-up. Show the live preview.
+  </aside>
+</section>
+
+<!-- ==================== INTERLUDE ARCHITECTURE ==================== -->
+<section>
+  <h2>Architecture</h2>
+  <div class="diagram">
+    <div class="arch">
+      <div class="arch-row">
+        <div class="arch-box">User (mobile / desktop)</div>
+      </div>
+      <div class="arch-arrow">↓</div>
+      <div class="arch-row">
+        <div class="arch-box blue">Caddy — Auto-TLS + Reverse Proxy</div>
+      </div>
+      <div class="arch-arrow">↓&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;↓ *.interludes.co.uk</div>
+      <div class="arch-row">
+        <div class="arch-group blue" style="flex: 1;">
+          <div class="arch-group-label blue">Next.js 16 App</div>
+          <div class="arch-box">Custom Server</div>
+          <div class="arch-box">API Routes</div>
+          <div class="arch-box">Chat UI</div>
+          <div class="arch-box">SSE Stream</div>
+          <div class="arch-box">Orchestrator</div>
+        </div>
+        <div class="arch-box" style="align-self: center;">SQLite</div>
+      </div>
+      <div class="arch-arrow">↓ Docker API</div>
+      <div class="arch-row">
+        <div class="arch-group green">
+          <div class="arch-group-label green">Agent Containers</div>
+          <div class="arch-box green">Claude Code + git</div>
+          <div class="arch-box green">Claude Code + git</div>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 8px; align-self: center;">
+          <div class="arch-box dim" style="font-size: 0.35em;">→ GitHub (push branches, PRs)</div>
+          <div class="arch-box dim" style="font-size: 0.35em;">← /workspace/platform/ mounted</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <p style="font-size: 0.5em;">Hetzner CX22 · ~€4.50/mo · Caddy on-demand TLS · Docker network DNS</p>
+  <aside class="notes">
+    Key thing: the platform repo is mounted into every agent container. That's how agents know the standards. The dashed connection is the critical link between brain and hands.
+  </aside>
+</section>
+
+<!-- ==================== TASK LIFECYCLE ==================== -->
+<section>
+  <h2>Task Lifecycle</h2>
+  <div class="diagram">
+    <div class="seq">
+      <div class="seq-row">
+        <div class="seq-actor blue">User</div>
+        <div class="seq-dir">→</div>
+        <div class="seq-msg blue">Create task & press Run</div>
+      </div>
+      <div class="seq-row">
+        <div class="seq-actor blue">API</div>
+        <div class="seq-dir">→</div>
+        <div class="seq-msg">Orchestrator starts — provisions Docker container</div>
+      </div>
+      <div class="seq-row">
+        <div class="seq-actor green">Agent</div>
+        <div class="seq-dir">→</div>
+        <div class="seq-msg green">Claude Code runs inside container (stream-json output)</div>
+      </div>
+      <div class="loop-wrap">
+        <div class="loop-label">each turn</div>
+        <div class="seq-row">
+          <div class="seq-actor green">Agent</div>
+          <div class="seq-dir">→</div>
+          <div class="seq-msg">Writes code, runs commands — output streams to chat UI via SSE</div>
+        </div>
+        <div class="seq-row">
+          <div class="seq-actor green">Agent</div>
+          <div class="seq-dir">→</div>
+          <div class="seq-msg">git push to branch after each turn</div>
+        </div>
+      </div>
+      <div class="seq-divider">user sends follow-up message</div>
+      <div class="seq-row">
+        <div class="seq-actor blue">Orchestrator</div>
+        <div class="seq-dir">→</div>
+        <div class="seq-msg purple">Resume Claude Code with --resume flag (container persists)</div>
+      </div>
+      <div class="seq-row">
+        <div class="seq-actor green">Agent</div>
+        <div class="seq-dir">→</div>
+        <div class="seq-msg green">Push updated branch → draft PR created on GitHub</div>
+      </div>
+    </div>
+  </div>
+  <aside class="notes">
+    Fire-and-forget execution. Container persists between turns so you can have a conversation. Every turn pushes to GitHub so work is never lost.
+  </aside>
+</section>
+
+<!-- ==================== THE FEEDBACK LOOP ==================== -->
+<section>
+  <h2>Working Together</h2>
+  <div class="diagram">
+    <div class="flow-v">
+      <div class="node blue" style="min-width: 340px;">Platform defines standards + choices</div>
+      <div class="arrow">↓</div>
+      <div class="node green" style="min-width: 340px;">Agent works via Interlude (in context)</div>
+      <div class="arrow">↓</div>
+      <div class="node" style="min-width: 340px;">Code ships — PR merged to product repo</div>
+      <div class="arrow">↓</div>
+      <div class="node" style="min-width: 340px;">Checks run — CI validates conformity</div>
+      <div class="arrow">↓</div>
+      <div class="split">
+        <div class="split-arm">
+          <div class="split-label">pass</div>
+          <div class="node green">Estate healthy</div>
+        </div>
+        <div class="split-arm">
+          <div class="split-label">gap found</div>
+          <div class="node red">Issue created</div>
+          <div class="arrow">↑ back to agent</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <p style="font-size: 0.55em;"><strong>Agents inherit context automatically</strong> — <code>/workspace/platform/</code> is mounted in every container.</p>
+  <aside class="notes">
+    This is the core idea. Platform defines intent. Agents execute with that context. Checks verify. Gaps feed back. It's a closed loop.
+  </aside>
+</section>
+
+<!-- ==================== COST ==================== -->
+<section>
+  <h2>Cost Discipline</h2>
+  <table>
+    <thead><tr><th>Service</th><th>Cost</th><th>What You Get</th></tr></thead>
+    <tbody>
+      <tr><td>Vercel Hobby</td><td>Free</td><td>All product hosting</td></tr>
+      <tr><td>Neon / Supabase</td><td>Free</td><td>Databases</td></tr>
+      <tr><td>Doppler</td><td>Free</td><td>Secrets</td></tr>
+      <tr><td>GitHub</td><td>Free</td><td>Repos + CI + Issues</td></tr>
+      <tr><td><strong>Hetzner CX22</strong></td><td><strong>~€4.50/mo</strong></td><td>Interlude VPS</td></tr>
+      <tr><td>Claude</td><td>Variable</td><td>$5/task budget cap</td></tr>
+    </tbody>
+  </table>
+  <p style="font-size: 0.55em; margin-top: 16px;">Total fixed cost: <strong>~€4.50/mo</strong>. The platform encodes cost constraints as first-class decisions.</p>
+  <aside class="notes">
+    The whole thing costs less than a single Pro subscription to most services. The platform doesn't just standardise tech choices — it standardises around cost-effective ones.
+  </aside>
+</section>
+
+<!-- ==================== ROADMAP ==================== -->
+<section>
+  <h2>Where We Are</h2>
+  <div style="text-align: left; font-size: 0.55em; line-height: 2.2;">
+    <span class="pass">✓</span> Phase 1 — Chat UI + API<br>
+    <span class="pass">✓</span> Phase 2a — Agent Orchestrator + Docker<br>
+    <span class="pass">✓</span> Phase 2.5 — VPS Deployment (Hetzner + Caddy)<br>
+    <span class="pass">✓</span> Phase 2b — Multi-Turn Interactive Chat<br>
+    <span class="pass">✓</span> Phase 2c — Live Preview (iframe proxy)<br>
+    <span class="pass">✓</span> Phase 2d — Subdomain Preview (on-demand TLS)<br>
+    <span style="color: #3b82f6;">→</span> <strong>Phase 3 — GitHub Integration</strong> (issue ↔ task sync, auto-PR)<br>
+    <span style="color: #71717a;">○</span> Phase 4 — Notification Bot (Slack / Telegram)<br>
+    <span style="color: #71717a;">○</span> Phase 5 — Production Hardening<br>
+  </div>
+  <aside class="notes">
+    Six phases complete, deployed and tested end-to-end on VPS. Phase 3 is in progress — this is the one that bridges manual dispatch to automated trigger via GitHub issues.
+  </aside>
+</section>
+
+<!-- ==================== NEAR TERM ==================== -->
+<section>
+  <h2>Near Term — GitHub as the Trigger</h2>
+  <div class="box blue" style="margin-bottom: 16px;">
+    <div class="box-title blue">Phase 3: Label → Agent → PR</div>
+    <p>Label a GitHub issue <code>interlude</code> → webhook fires → task created → agent works → draft PR filed → marked ready on completion.</p>
+    <p><strong>The trigger moves from a UI button to a GitHub label.</strong></p>
+  </div>
+  <div class="grid-2">
+    <div class="box"><div class="box-title blue">Phase 4</div><p>Slack/Telegram bot. "Fix the login bug on lemons" → agent runs.</p></div>
+    <div class="box"><div class="box-title blue">Phase 5</div><p>Resource limits, backups, monitoring, alerting.</p></div>
+  </div>
+  <aside class="notes">
+    Phase 3 is the key transition point. Today you manually create tasks. After Phase 3, you label an issue and walk away. That's the first step toward autonomous operation.
+  </aside>
+</section>
+
+<!-- ==================== MEDIUM TERM ==================== -->
+<section>
+  <h2>Medium Term — The Control Plane</h2>
+  <p style="font-size: 0.6em; margin-bottom: 16px;">The platform repo gets a UI. It evolves from files into a <strong>dashboard</strong>.</p>
+  <div class="grid-2">
+    <div class="box purple">
+      <div class="box-title purple">Estate Dashboard</div>
+      <p>Conformity status at a glance. Drill into gaps. One-click remediation dispatch.</p>
+    </div>
+    <div class="box purple">
+      <div class="box-title purple">Version Tracker</div>
+      <p>Which projects are behind? One-click upgrade — agent creates the PR.</p>
+    </div>
+    <div class="box purple">
+      <div class="box-title purple">Multi-Agent Workflows</div>
+      <p>Architect → Implementer → Reviewer pipeline. Parallel branches. DAG execution.</p>
+    </div>
+    <div class="box purple">
+      <div class="box-title purple">On-Demand Compute</div>
+      <p>Orchestrator spins up cloud VMs for heavy tasks. Auto-teardown.</p>
+    </div>
+  </div>
+  <aside class="notes">
+    This is where Platform and Interlude merge conceptually. The platform becomes the control plane — the UI for seeing and managing the estate. Interlude becomes the execution engine underneath it.
+  </aside>
+</section>
+
+<!-- ==================== CONTROL PLANE DIAGRAM ==================== -->
+<section>
+  <h2>Control Plane Architecture</h2>
+  <div class="diagram">
+    <div class="arch">
+      <div class="arch-row">
+        <div class="arch-group purple" style="padding: 16px 20px;">
+          <div class="arch-group-label purple">Platform UI</div>
+          <div class="arch-box purple">Dashboard</div>
+          <div class="arch-box purple">Task Feed</div>
+          <div class="arch-box purple">Project Manager</div>
+        </div>
+      </div>
+      <div class="arch-arrow">↓</div>
+      <div class="arch-row">
+        <div class="arch-group green" style="padding: 16px 20px;">
+          <div class="arch-group-label green">Interlude Engine</div>
+          <div class="arch-box green">Orchestrator</div>
+          <div class="arch-box green">Local VPS</div>
+          <div class="arch-box green">Cloud Compute</div>
+        </div>
+      </div>
+      <div class="arch-arrow">↓</div>
+      <div class="arch-row">
+        <div class="arch-group blue" style="padding: 16px 20px;">
+          <div class="arch-group-label blue">Agent Pool</div>
+          <div class="arch-box blue">Architect</div>
+          <div class="arch-box blue">Implementer</div>
+          <div class="arch-box blue">Implementer</div>
+          <div class="arch-box blue">Reviewer</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <aside class="notes">
+    Platform UI is the brain with a face. Interlude is the execution engine. Agent pool is where the work happens. The key insight: you're looking at the estate, not at individual repos.
+  </aside>
+</section>
+
+<!-- ==================== BLUE SKY ==================== -->
+<section>
+  <h2>Blue Sky — Autonomous Estate</h2>
+  <div style="text-align: left; font-size: 0.55em; line-height: 2;">
+    <strong style="color: #a78bfa;">Self-healing conformity</strong> — gap detected → agent fixes → PR filed<br>
+    <strong style="color: #a78bfa;">Automated upgrades</strong> — new Next.js → agent upgrades test project → rolls out estate<br>
+    <strong style="color: #a78bfa;">Self-provisioning</strong> — new project in UI → agent scaffolds, provisions, wires CI/CD<br>
+    <strong style="color: #a78bfa;">Cost monitoring</strong> — agents watch spend, flag anomalies, propose cheaper stacks<br>
+    <strong style="color: #a78bfa;">Agents maintaining agents</strong> — self-upgrading tooling, tuned CLAUDE.md from outcomes<br>
+  </div>
+  <aside class="notes">
+    The end state: the platform is a control plane, Interlude is the execution engine. You define intent and constraints. Agents execute. You review proposals. Your role shifts from writing code to directing agents.
+  </aside>
+</section>
+
+<!-- ==================== AUTONOMOUS LOOP ==================== -->
+<section>
+  <h2>The Autonomous Loop</h2>
+  <div class="diagram">
+    <div class="flow-v">
+      <div class="node purple">Detect — gap / new version / issue / anomaly</div>
+      <div class="arrow">↓</div>
+      <div class="node purple">Plan — agent decomposes into tasks</div>
+      <div class="arrow">↓</div>
+      <div class="node purple">Execute — agents work in parallel</div>
+      <div class="arrow">↓</div>
+      <div class="node purple">Verify — tests + conformity + build</div>
+      <div class="arrow">↓</div>
+      <div class="node purple">Propose — PR + summary for review</div>
+      <div class="arrow">↓</div>
+      <div class="node blue">Human reviews and approves</div>
+      <div class="arrow" style="color: #71717a;">↻ feedback loop</div>
+    </div>
+  </div>
+  <p style="font-size: 0.55em;"><strong>Your role shifts</strong> from writing code to <strong>reviewing proposals, setting direction, and adjusting constraints</strong>.</p>
+  <aside class="notes">
+    The human is still in the loop but the nature of the work changes. You're not writing code — you're defining what good looks like and reviewing what agents produce. The platform is your intent, encoded.
+  </aside>
+</section>
+
+<!-- ==================== DEMOS ==================== -->
+<section>
+  <h2>Demos</h2>
+  <div style="text-align: left; font-size: 0.55em; line-height: 2.4;">
+    <div class="demo-label">Demo 1</div>
+    Run <code>./checks/check-estate.sh</code> — live conformity scan<br><br>
+    <div class="demo-label">Demo 2</div>
+    Walk through <code>products/last-person-standing.yaml</code> — the golden path<br><br>
+    <div class="demo-label">Demo 3</div>
+    Dispatch a task on <a href="https://interludes.co.uk">interludes.co.uk</a> from mobile — watch the agent work<br><br>
+    <div class="demo-label">Demo 4</div>
+    Show platform context inside an agent container — <code>/workspace/platform/</code><br><br>
+    <div class="demo-label">Demo 5</div>
+    GitHub issue → agent task → draft PR <em>(if Phase 3 ready)</em>
+  </div>
+</section>
+
+<!-- ==================== END ==================== -->
+<section>
+  <h1>Questions?</h1>
+  <p class="subtitle">Platform · Interlude · Built with Claude · March 2026</p>
+</section>
+
+</div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/reveal.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5/plugin/notes/notes.js"></script>
+<script>
+  Reveal.initialize({
+    hash: true,
+    slideNumber: 'c/t',
+    width: 1280,
+    height: 720,
+    margin: 0.08,
+    transition: 'fade',
+    transitionSpeed: 'fast',
+    plugins: [RevealNotes]
+  });
+</script>
+
+</body>
+</html>
