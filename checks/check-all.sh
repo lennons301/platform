@@ -24,7 +24,7 @@ echo "$NAME:"
 TOTAL_GAPS=0
 
 # Run each check, count failures
-for check in check-secrets check-versions check-environments check-documentation; do
+for check in check-secrets check-versions check-environments check-documentation check-architecture; do
   if ! "$SCRIPT_DIR/$check.sh" "$PROJECT_PATH" "$PRODUCT_YAML"; then
     TOTAL_GAPS=$((TOTAL_GAPS + 1))
   fi
