@@ -413,7 +413,7 @@
   <h2>The Platform Repo</h2>
   <p style="font-size: 0.55em; margin-bottom: 12px;">A single repo that defines what the estate should look like — consumed by both humans and agents.</p>
   <pre><code>platform/
-├── standards/     5 principles (environments, secrets, local-dev, docs, testing)
+├── standards/     6 principles (environments, secrets, local-dev, docs, testing, architecture)
 ├── choices/       6 decision areas with matrices (db, auth, hosting, orm, secrets, ui)
 ├── versions/      Target runtimes (Node 22, Next.js 16, React 19, TS 5.7)
 ├── products/      Registry: each project's choices, versions, divergences
@@ -429,7 +429,7 @@
 <section>
   <div class="chapter four">Chapter 4</div>
   <h2>Standards</h2>
-  <p style="font-size: 0.55em; margin-bottom: 16px;">Five tool-agnostic rules every project must follow — regardless of which database or framework is chosen.</p>
+  <p style="font-size: 0.55em; margin-bottom: 16px;">Six tool-agnostic rules every project must follow — regardless of which database or framework is chosen.</p>
   <div class="grid-2" style="gap: 12px;">
     <div class="box" style="padding: 14px 18px;">
       <div class="box-title purple" style="font-size: 0.5em;">Environments</div>
@@ -448,12 +448,18 @@
       <p style="font-size: 0.48em;">Every repo has a <code>CLAUDE.md</code> — the primary technical reference for both humans and AI agents. Updated at the end of each phase.</p>
     </div>
   </div>
-  <div class="box" style="padding: 14px 18px; margin-top: 12px;">
-    <div class="box-title purple" style="font-size: 0.5em;">Testing</div>
-    <p style="font-size: 0.48em;">Automated tests running against local services. CI runs them on every PR.</p>
+  <div class="grid-2" style="gap: 12px; margin-top: 12px;">
+    <div class="box" style="padding: 14px 18px;">
+      <div class="box-title purple" style="font-size: 0.5em;">Testing</div>
+      <p style="font-size: 0.48em;">Automated tests running against local services. CI runs them on every PR.</p>
+    </div>
+    <div class="box" style="padding: 14px 18px;">
+      <div class="box-title purple" style="font-size: 0.5em;">Architecture Diagrams</div>
+      <p style="font-size: 0.48em;">C4-PlantUML diagrams (<code>context.puml</code> + <code>containers.puml</code> minimum). CI renders to SVG. Staleness detection nudges updates.</p>
+    </div>
   </div>
   <aside class="notes">
-    These are the non-negotiables. They're tool-agnostic — swap Neon for Supabase and the standards still hold. The CLAUDE.md standard is the AI-specific one — every agent that touches a repo gets context automatically.
+    These are the non-negotiables. They're tool-agnostic — swap Neon for Supabase and the standards still hold. The CLAUDE.md standard is the AI-specific one — every agent that touches a repo gets context automatically. Architecture diagrams are C4-PlantUML — source files are locally renderable in any IDE, CI renders them to SVG for GitHub.
   </aside>
 </section>
 
@@ -492,19 +498,22 @@ interlude:
   versions: <span class="fail">✗</span> (drizzle-kit: unknown → 0.30)
   environments: <span class="pass">✓</span>
   documentation: <span class="fail">✗</span> (missing section: command)
+  architecture: <span class="fail">✗</span> (no docs/architecture/ directory)
 
 last-person-standing:
   secrets: <span class="fail">✗</span> (no doppler.yaml found)
   environments: <span class="pass">✓</span>
   documentation: <span class="pass">✓</span>
+  architecture: <span class="fail">✗</span> (no docs/architecture/ directory)
 
 lemons:
   secrets: <span class="fail">✗</span> (not yet migrated to Doppler)
   environments: <span class="pass">✓</span>
   documentation: <span class="pass">✓</span>
+  architecture: <span class="fail">✗</span> (no docs/architecture/ directory)
 
 ═══════════════════════════════════════
-<span class="fail">6 gap(s)</span> found across 3 product(s).
+<span class="fail">9 gap(s)</span> found across 3 product(s).
 Run checks/create-issues.sh to file GitHub Issues.</code></pre>
   <aside class="notes">
     DEMO: Run this live in the terminal. Show the real output. Point out the intentional divergence (purple tick) vs actual gaps (red cross). CI runs this on every push.
