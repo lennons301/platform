@@ -55,14 +55,14 @@ fi
 # 4+5. Validate C4 content in each .puml file
 if ls "$ARCH_DIR"/*.puml 1>/dev/null 2>&1; then
   for puml_file in "$ARCH_DIR"/*.puml; do
-    basename=$(basename "$puml_file")
+    puml_name=$(basename "$puml_file")
     # Check for C4-PlantUML include
     if ! grep -q '!include.*C4_' "$puml_file"; then
-      ISSUES+=("$basename: no C4-PlantUML include")
+      ISSUES+=("$puml_name: no C4-PlantUML include")
     fi
     # Check for at least one C4 model element
     if ! grep -qE '(Person|System|Container|System_Boundary|System_Ext|ContainerDb|Deployment_Node|Rel)\(' "$puml_file"; then
-      ISSUES+=("$basename: no C4 model elements found")
+      ISSUES+=("$puml_name: no C4 model elements found")
     fi
   done
 fi
@@ -70,9 +70,9 @@ fi
 # 6. Check rendered SVGs exist
 if ls "$ARCH_DIR"/*.puml 1>/dev/null 2>&1; then
   for puml_file in "$ARCH_DIR"/*.puml; do
-    basename=$(basename "$puml_file" .puml)
-    if [ ! -f "$ARCH_DIR/rendered/$basename.svg" ]; then
-      WARNINGS+=("rendered/$basename.svg missing (CI may not have run)")
+    puml_base=$(basename "$puml_file" .puml)
+    if [ ! -f "$ARCH_DIR/rendered/$puml_base.svg" ]; then
+      WARNINGS+=("rendered/$puml_base.svg missing (CI may not have run)")
     fi
   done
 fi
@@ -87,7 +87,7 @@ if [ ${#ISSUES[@]} -eq 0 ] && ls "$ARCH_DIR"/*.puml 1>/dev/null 2>&1; then
   STALE_COUNT=$(yq eval '.architecture.staleness_paths | length' "$PRODUCT_YAML" 2>/dev/null)
   if [ "$STALE_COUNT" != "null" ] && [ "$STALE_COUNT" != "0" ] && [ -n "$STALE_COUNT" ]; then
     for i in $(seq 0 $((STALE_COUNT - 1))); do
-      STALE_PATHS+=($(yq eval ".architecture.staleness_paths[$i]" "$PRODUCT_YAML"))
+      STALE_PATHS+=("$(yq eval ".architecture.staleness_paths[$i]" "$PRODUCT_YAML")")
     done
   else
     # Defaults
