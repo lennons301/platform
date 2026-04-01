@@ -1,0 +1,21 @@
+@startuml containers
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+title Container Diagram — {{PROJECT_NAME}}
+
+Person(user, "User", "{{USER_DESCRIPTION}}")
+
+System_Boundary(boundary, "{{PROJECT_NAME}}") {
+    Container(web, "Web App", "Next.js", "Server-rendered frontend")
+    Container(api, "API Routes", "Next.js API", "Backend logic")
+    ContainerDb(db, "Database", "{{DATABASE}}", "Persistent storage")
+}
+
+System_Ext(ext_auth, "Auth Provider", "{{AUTH}}")
+
+Rel(user, web, "Uses", "HTTPS")
+Rel(web, api, "Calls", "Internal")
+Rel(api, db, "Reads/writes", "SQL/SDK")
+Rel(api, ext_auth, "Authenticates via", "HTTPS")
+
+@enduml

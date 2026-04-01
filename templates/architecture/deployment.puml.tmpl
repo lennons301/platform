@@ -1,0 +1,23 @@
+@startuml deployment
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Deployment.puml
+
+title Deployment Diagram — {{PROJECT_NAME}}
+
+Deployment_Node(dev, "Development", "Local machine") {
+    Deployment_Node(dev_docker, "Docker Compose") {
+        Container(dev_db, "Database", "{{DEV_DATABASE}}")
+    }
+    Container(dev_app, "Dev Server", "Next.js dev")
+}
+
+Deployment_Node(stg, "Staging", "{{STG_HOST}}") {
+    Container(stg_app, "Web App", "Next.js")
+    ContainerDb(stg_db, "Database", "{{STG_DATABASE}}")
+}
+
+Deployment_Node(prd, "Production", "{{PRD_HOST}}") {
+    Container(prd_app, "Web App", "Next.js")
+    ContainerDb(prd_db, "Database", "{{PRD_DATABASE}}")
+}
+
+@enduml

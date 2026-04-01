@@ -1,0 +1,18 @@
+@startuml context
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Context.puml
+
+title System Context — {{PROJECT_NAME}}
+
+Person(user, "User", "{{USER_DESCRIPTION}}")
+
+System(system, "{{PROJECT_NAME}}", "{{DESCRIPTION}}")
+
+' External systems — add or remove as needed
+System_Ext(ext_auth, "Auth Provider", "Handles authentication")
+System_Ext(ext_db, "Database", "Persistent storage")
+
+Rel(user, system, "Uses")
+Rel(system, ext_auth, "Authenticates via")
+Rel(system, ext_db, "Reads/writes")
+
+@enduml
