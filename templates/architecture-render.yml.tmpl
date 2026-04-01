@@ -1,0 +1,39 @@
+# Architecture Diagram Renderer
+# Copy to .github/workflows/architecture-render.yml in your project repo.
+name: Render Architecture Diagrams
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - 'docs/architecture/*.puml'
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create output directory
+        run: mkdir -p docs/architecture/rendered
+
+      - name: Render PlantUML to SVG
+        run: |
+          docker run --rm \
+            -v "${{ github.workspace }}/docs/architecture:/data" \
+            plantuml/plantuml \
+            -tsvg -o /data/rendered /data/*.puml
+
+      - name: Commit rendered diagrams
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/architecture/rendered/*.svg
+          if git diff --cached --quiet; then
+            echo "No diagram changes to commit"
+          else
+            git commit -m "chore: render architecture diagrams [skip ci]"
+            git push
+          fi

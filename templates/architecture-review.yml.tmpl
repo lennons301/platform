@@ -1,0 +1,55 @@
+# Architecture Review Nudge
+# Copy to .github/workflows/architecture-review.yml in your project repo.
+# Customise the paths list below to match your project's staleness_paths.
+name: Architecture Review Nudge
+
+on:
+  pull_request:
+    paths:
+      # Customise these paths to match your product YAML's staleness_paths
+      - 'docker-compose.yml'
+      - 'docker-compose.yaml'
+      - 'vercel.json'
+      - 'supabase/**'
+      - 'drizzle/**'
+      - 'Dockerfile'
+      - 'infrastructure/**'
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check if diagrams were updated
+        id: check
+        run: |
+          CHANGED=$(git diff --name-only origin/${{ github.base_ref }}...HEAD -- docs/architecture/)
+          if [ -z "$CHANGED" ]; then
+            echo "needs_review=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "needs_review=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Comment on PR
+        if: steps.check.outputs.needs_review == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = '**Architecture review nudge:** This PR modifies files that may affect the system architecture, but no diagrams in `docs/architecture/` were updated. Please check whether the C4 diagrams need updating.';
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const existing = comments.find(c => c.body.includes('Architecture review nudge'));
+            if (!existing) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
