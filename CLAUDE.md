@@ -19,6 +19,7 @@ products/            — per-project YAML registry (choices, versions, divergenc
 versions/            — runtime/framework version manifest
 checks/              — conformity check scripts (shell)
 templates/           — starter files for new projects
+scripts/             — setup and sync utilities
 .github/workflows/   — CI automation (estate-wide conformity audits)
 docs/                — presentations and design specs
 ```
@@ -38,6 +39,10 @@ docs/                — presentations and design specs
 ./checks/check-versions.sh <project-path> <product-yaml>
 ./checks/check-environments.sh <project-path> <product-yaml>
 ./checks/check-architecture.sh <project-path> <product-yaml>
+
+# Sync global Claude Code instructions from this repo to ~/.claude/CLAUDE.md
+./scripts/sync-claude-md.sh           # interactive (shows diff, prompts)
+./scripts/sync-claude-md.sh --force   # non-interactive
 ```
 
 ## Key Conventions
