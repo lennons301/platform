@@ -11,7 +11,7 @@ choices:
   auth: supabase-auth
   orm: supabase-client
   ui: shadcn-tailwind
-  secrets: pending-migration
+  secrets: doppler
 
 versions:
   node: "22"
