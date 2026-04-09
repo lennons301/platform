@@ -12,6 +12,14 @@
 
 **Dependencies (gating):** Logo, finalised colour palette, photography. Tasks 1-6 can proceed with placeholders. Tasks 7+ require brand assets.
 
+**Human review gates:** Tasks involving visual/design output require human review before proceeding to the next task. These are marked with `🔍 HUMAN REVIEW` below. Do not proceed past a review gate until the user has approved.
+
+- **Task 3** (colour palette in Tailwind) — confirm palette renders as expected
+- **Task 6** (layout, nav, footer) — confirm look and feel, mobile menu UX
+- **Task 7** (homepage) — confirm overall page composition, section rhythm, CTA styling
+- **Task 9** (content pages) — confirm page templates feel consistent and on-brand
+- **Task 12** (brand assets) — confirm logo placement, photography treatment, final palette
+
 ---
 
 ## File Structure
@@ -310,7 +318,7 @@ git commit -m "feat: register moontide product in platform repo"
 
 ---
 
-### Task 3: Install Dependencies & Configure Tailwind Palette
+### Task 3: Install Dependencies & Configure Tailwind Palette 🔍 HUMAN REVIEW
 
 **Files:**
 - Modify: `moontide/package.json` (dependencies)
@@ -1063,7 +1071,7 @@ git commit -m "feat: add Sanity CMS schema, studio, and client"
 
 ---
 
-### Task 6: Root Layout, Navigation & Footer
+### Task 6: Root Layout, Navigation & Footer 🔍 HUMAN REVIEW
 
 **Files:**
 - Modify: `moontide/src/app/layout.tsx`
@@ -1281,7 +1289,7 @@ git commit -m "feat: add root layout with nav, mobile menu, and footer"
 
 ---
 
-### Task 7: Homepage
+### Task 7: Homepage 🔍 HUMAN REVIEW
 
 **Files:**
 - Modify: `moontide/src/app/page.tsx`
@@ -1913,7 +1921,7 @@ git commit -m "feat: add contact form API with DB storage and email forwarding"
 
 ---
 
-### Task 9: Content Pages (About, Classes, Coaching, Community, Private, Terms, Contact)
+### Task 9: Content Pages (About, Classes, Coaching, Community, Private, Terms, Contact) 🔍 HUMAN REVIEW
 
 **Files:**
 - Create: `moontide/src/app/about/page.tsx`
@@ -2566,7 +2574,7 @@ Navigate to the production URL. Expected: All pages load, CMS content appears, c
 
 ---
 
-### Task 12: Brand Assets Integration
+### Task 12: Brand Assets Integration 🔍 HUMAN REVIEW
 
 **Dependencies:** Logo, finalised colour palette, photography must be provided before this task.
 
