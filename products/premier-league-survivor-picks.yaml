@@ -12,6 +12,10 @@ choices:
   orm: supabase-client
   ui: shadcn-tailwind
   secrets: env-file
+  dev_environment: none
+  linting: none
+  observability: none
+  ci_cd: github-actions
 
 versions:
   node: "18"

@@ -12,6 +12,10 @@ choices:
   orm: supabase-client
   ui: shadcn-tailwind
   secrets: doppler
+  dev_environment: mise-just
+  linting: biome
+  observability: sentry
+  ci_cd: github-actions
 
 versions:
   node: "22"

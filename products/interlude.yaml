@@ -11,6 +11,10 @@ choices:
   auth: none
   secrets: env-file
   ui: shadcn-tailwind
+  dev_environment: mise-just
+  linting: biome
+  observability: sentry
+  ci_cd: github-actions
 
 versions:
   node: "22"

@@ -16,10 +16,13 @@ to understand its current choices and any intentional divergences.
 
 ## Documentation Maintenance
 
-- Every implementation plan must include a final task: "Update the project's
-  CLAUDE.md with any new conventions, patterns, or key files introduced in
-  this phase." (The project's CLAUDE.md, not this global one.)
-- When creating a new project's CLAUDE.md, include a "Key Conventions" section.
+- Every project's technical context lives in `AGENTS.md` (agent-agnostic).
+  `CLAUDE.md` references it with `@AGENTS.md` and adds only Claude-specific
+  instructions if needed.
+- `AGENTS.md` should be kept current via hooks as part of the development
+  process — see `standards/agent-context.md` for details.
+- When creating a new project, use `templates/AGENTS.md.template` and
+  `templates/CLAUDE.md.template` from the platform repo.
 
 ## Architecture Diagram Maintenance
 

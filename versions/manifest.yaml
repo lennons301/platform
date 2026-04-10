@@ -14,6 +14,11 @@ languages:
 
 tooling:
   pnpm: "9"
+  uv: "0.11"
+  mise: "2026.4"       # calver (YYYY.M)
+  just: "1"
+  biome: "1"
+  ruff: "0.11"
   drizzle-kit: "0.30"
 
 overrides:
