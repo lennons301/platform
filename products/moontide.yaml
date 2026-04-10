@@ -3,7 +3,7 @@ description: Wellbeing website for women navigating change through yoga, coachin
 category: product
 repo: lennons301/moontide
 status: active
-package_manager: npm
+package_manager: pnpm
 
 choices:
   hosting: vercel-hobby
