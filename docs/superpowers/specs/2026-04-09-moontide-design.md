@@ -304,21 +304,20 @@ As specified:
 
 ## Implementation Phases
 
-### Phase 1 — Foundation & Design
+### Phase 1 — Foundation & Design (COMPLETE)
 
 - New git repository + Next.js 16 project setup (platform-aligned stack)
 - Product YAML registered in platform repo
-- Brand assets integration — logo, colour palette finalisation, photography
-- Sanity CMS schema and studio setup
-- All public pages with CMS-driven content and photography
+- Sanity CMS schema, studio, and initial content seeding
+- All public pages with CMS-driven content (placeholder imagery)
 - Responsive layout (mobile-first), burger menu navigation, footer
 - Contact form (DB storage + Resend email forwarding)
-- Domain purchase and Vercel deployment
+- Doppler secrets (dev/stg/prd), Vercel deployment, GitHub repo
 - CLAUDE.md for the project
 
-**Dependencies:** Logo, finalised colour palette, photography
+**Deliverable:** Live website with all content pages, contact form working. Gabrielle can edit content in Sanity Studio.
 
-**Deliverable:** Live, fully designed website with all content pages, brand identity in place, contact form working. Gabrielle can edit content in Sanity.
+**Deferred to later:** Logo and photography (self-service via Sanity Studio when ready), colour palette finalisation (code change to globals.css), domain purchase.
 
 ### Phase 2 — Booking & Payments
 
@@ -331,8 +330,9 @@ As specified:
 
 **Deliverable:** Gabrielle can create classes in admin, customers can book and pay.
 
-### Phase 3 — Polish & Future Features
+### Phase 3 — Polish & Brand
 
+- Brand asset integration — colour palette finalisation, domain setup
 - Waitlist functionality
 - Email reminders and booking confirmations (Resend)
 - Recurring schedule generation
@@ -341,7 +341,7 @@ As specified:
 - Architecture diagrams (C4-PlantUML per platform standard)
 - Content subscription / newsletter capability
 
-**Deliverable:** Complete feature set, production-hardened.
+**Deliverable:** Complete feature set, production-hardened, fully branded.
 
 ---
 
