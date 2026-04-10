@@ -13,14 +13,15 @@ if has_divergence "$PRODUCT_YAML" "environments"; then
 fi
 
 ISSUES=()
+CONTEXT_FILE=$(resolve_context_file "$PROJECT_PATH")
 
-# Check CLAUDE.md documents environments
-if [ -f "$PROJECT_PATH/CLAUDE.md" ]; then
-  if ! grep -qiE '(dev|stg|prd|production|staging|local)' "$PROJECT_PATH/CLAUDE.md"; then
-    ISSUES+=("CLAUDE.md does not document environments")
+# Check context file documents environments
+if [ -n "$CONTEXT_FILE" ]; then
+  if ! grep -qiE '(dev|stg|prd|production|staging|local)' "$CONTEXT_FILE"; then
+    ISSUES+=("project context does not document environments")
   fi
 else
-  ISSUES+=("no CLAUDE.md found")
+  ISSUES+=("no context file found")
 fi
 
 # Check for local dev setup

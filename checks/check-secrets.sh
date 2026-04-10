@@ -20,23 +20,22 @@ if has_divergence "$PRODUCT_YAML" "secrets"; then
 fi
 
 SECRETS_CHOICE=$(yaml_get "$PRODUCT_YAML" '.choices.secrets')
+CONTEXT_FILE=$(resolve_context_file "$PROJECT_PATH")
 ISSUES=()
 
 case "$SECRETS_CHOICE" in
   doppler)
-    # Check for Doppler config
-    if [ ! -f "$PROJECT_PATH/doppler.yaml" ] && [ ! -f "$PROJECT_PATH/.doppler.yaml" ]; then
-      ISSUES+=("no doppler.yaml found")
-    fi
     # Check for committed .env files
     if git -C "$PROJECT_PATH" ls-files '*.env' '*.env.*' --error-unmatch 2>/dev/null | grep -q '.'; then
       ISSUES+=("committed .env files found in git")
     fi
-    # Check CLAUDE.md references doppler
-    if [ -f "$PROJECT_PATH/CLAUDE.md" ]; then
-      if ! grep -qi "doppler" "$PROJECT_PATH/CLAUDE.md"; then
-        ISSUES+=("CLAUDE.md does not reference Doppler")
+    # Check context file references Doppler
+    if [ -n "$CONTEXT_FILE" ]; then
+      if ! grep -qi "doppler" "$CONTEXT_FILE"; then
+        ISSUES+=("project context does not reference Doppler")
       fi
+    else
+      ISSUES+=("no context file found")
     fi
     ;;
   pending-migration)

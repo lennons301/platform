@@ -14,17 +14,27 @@ if [ ! -f "$PROJECT_PATH/CLAUDE.md" ]; then
   exit 1
 fi
 
-CLAUDE_MD="$PROJECT_PATH/CLAUDE.md"
+# Resolve the context file (AGENTS.md if referenced, otherwise CLAUDE.md)
+CONTEXT_FILE=$(resolve_context_file "$PROJECT_PATH")
+if [ -z "$CONTEXT_FILE" ]; then
+  echo -e "  documentation: ${FAIL} (no context file found)"
+  exit 1
+fi
 
-# Check required sections (case-insensitive heading search)
+# If CLAUDE.md references @AGENTS.md, verify AGENTS.md exists
+if grep -q "@AGENTS.md" "$PROJECT_PATH/CLAUDE.md" && [ ! -f "$PROJECT_PATH/AGENTS.md" ]; then
+  ISSUES+=("CLAUDE.md references @AGENTS.md but file missing")
+fi
+
+# Check required sections in the context file (case-insensitive heading search)
 for section in "command" "stack|tech" "convention"; do
-  if ! grep -qiE "^#.*($section)" "$CLAUDE_MD"; then
+  if ! grep -qiE "^#.*($section)" "$CONTEXT_FILE"; then
     ISSUES+=("missing section: $section")
   fi
 done
 
 # Check platform context pointer
-if ! grep -qi "platform" "$CLAUDE_MD"; then
+if ! grep -qi "platform" "$CONTEXT_FILE"; then
   ISSUES+=("no platform context pointer")
 fi
 

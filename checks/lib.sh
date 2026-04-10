@@ -58,3 +58,20 @@ product_category() {
 product_name() {
   yaml_get "$1" '.name'
 }
+
+# Resolve the project context file. If CLAUDE.md contains "@AGENTS.md",
+# return the path to AGENTS.md. Otherwise return CLAUDE.md.
+# Usage: resolve_context_file <project-path>
+resolve_context_file() {
+  local project_path="$1"
+  local claude_md="$project_path/CLAUDE.md"
+  local agents_md="$project_path/AGENTS.md"
+
+  if [ -f "$claude_md" ] && grep -q "@AGENTS.md" "$claude_md" && [ -f "$agents_md" ]; then
+    echo "$agents_md"
+  elif [ -f "$claude_md" ]; then
+    echo "$claude_md"
+  else
+    echo ""
+  fi
+}

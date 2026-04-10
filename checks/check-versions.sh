@@ -16,11 +16,10 @@ if [ ! -f "$MANIFEST" ]; then
 fi
 
 CATEGORY=$(product_category "$PRODUCT_YAML")
+PKG_MANAGER=$(yaml_get "$PRODUCT_YAML" '.package_manager')
 GAPS=()
 
 # Compare a single version. Conformant if actual >= target (floor, not pin).
-# Major-only target "22": any 22.x satisfies.
-# Minor target "5.7": any 5.7.x or higher satisfies. 5.3 would NOT satisfy.
 check_version() {
   local key="$1" actual="$2" target="$3"
   if [ -z "$actual" ] || [ "$actual" = "null" ]; then
@@ -30,7 +29,6 @@ check_version() {
   local actual_major actual_minor target_major target_minor
   actual_major=$(echo "$actual" | cut -d. -f1)
   target_major=$(echo "$target" | cut -d. -f1)
-  # Extract minor version; default to 0 if not present
   actual_minor=$(echo "$actual" | cut -d. -f2 -s)
   target_minor=$(echo "$target" | cut -d. -f2 -s)
   [ -z "$actual_minor" ] && actual_minor=0
@@ -44,16 +42,88 @@ check_version() {
   fi
 }
 
+# Detect actual version from project files.
+# For runtimes/frameworks/languages: check product YAML first.
+# For tooling: check .mise.toml and package.json devDependencies.
+detect_version() {
+  local key="$1"
+  local version=""
+
+  # 1. Check product YAML versions section
+  version=$(yaml_get "$PRODUCT_YAML" ".versions.$key")
+  if [ -n "$version" ] && [ "$version" != "null" ]; then
+    echo "$version"
+    return
+  fi
+
+  # 2. Check .mise.toml for runtime/tooling versions
+  if [ -f "$PROJECT_PATH/.mise.toml" ]; then
+    # mise.toml format: key = "version" under [tools]
+    local mise_version
+    mise_version=$(grep -E "^${key}\s*=" "$PROJECT_PATH/.mise.toml" 2>/dev/null | sed 's/.*=\s*"\?\([^"]*\)"\?/\1/' | tr -d ' ')
+    if [ -n "$mise_version" ]; then
+      echo "$mise_version"
+      return
+    fi
+  fi
+
+  # 3. Check package.json devDependencies for tooling (e.g. biome, drizzle-kit)
+  if [ -f "$PROJECT_PATH/package.json" ]; then
+    local pkg_key="$key"
+    # Map tool names to package names
+    case "$key" in
+      biome) pkg_key="@biomejs/biome" ;;
+      drizzle-kit) pkg_key="drizzle-kit" ;;
+    esac
+    local pkg_version
+    pkg_version=$(grep "\"$pkg_key\"" "$PROJECT_PATH/package.json" 2>/dev/null | head -1 | sed 's/.*: *"\^*~*\([0-9][^"]*\)".*/\1/')
+    if [ -n "$pkg_version" ]; then
+      echo "$pkg_version"
+      return
+    fi
+  fi
+
+  echo ""
+}
+
+# Determine which tools are relevant for this project's ecosystem
+is_relevant_tool() {
+  local key="$1"
+  case "$key" in
+    # Python-only tools — skip for JS/TS projects
+    uv|ruff)
+      [ "$PKG_MANAGER" = "uv" ] && return 0 || return 1
+      ;;
+    # JS/TS-only tools — skip for Python projects
+    pnpm|biome)
+      [ "$PKG_MANAGER" = "pnpm" ] || [ "$PKG_MANAGER" = "npm" ] && return 0 || return 1
+      ;;
+    # Meta-tools (installed globally, not per-project)
+    mise|just)
+      return 1
+      ;;
+    # Universal tools
+    *)
+      return 0
+      ;;
+  esac
+}
+
 # Iterate version categories in manifest
 for section in runtimes frameworks languages tooling; do
   keys=$(yq eval ".$section | keys | .[]" "$MANIFEST" 2>/dev/null)
   for key in $keys; do
+    # Skip tools not relevant to this project's ecosystem
+    if ! is_relevant_tool "$key"; then
+      continue
+    fi
+
     # Get target: check category override first, then default
     target=$(yq eval ".overrides.$CATEGORY.$key // .$section.$key" "$MANIFEST" 2>/dev/null)
     if [ -z "$target" ] || [ "$target" = "null" ]; then continue; fi
 
-    # Get actual from product YAML
-    actual=$(yaml_get "$PRODUCT_YAML" ".versions.$key")
+    # Detect actual version from project files
+    actual=$(detect_version "$key")
 
     check_version "$key" "$actual" "$target"
   done
