@@ -17,17 +17,17 @@
 
 | Provider | dev | stg | prd |
 |---|---|---|---|
-| **Neon** | Local Postgres container | Neon branch (ephemeral — seed, use, delete) | `main` branch |
+| **Neon** | Local Postgres container **or** Neon `dev` branch | Neon branch (ephemeral — seed, use, delete) | `main` branch |
 | **Supabase** | `supabase start` (local stack) | Share prd credentials (anon key is RLS-protected) | Production project |
 
-**Rationale:** Neon branching is free — stg branches cost nothing when idle. Supabase free tier only allows 2 projects, so stg piggybacks on prd via the anon key (already public/RLS-safe by design).
+**Rationale:** Neon branching is free — branches cost nothing when idle. Local Postgres is preferred for dev when practical (offline-capable, zero latency). A Neon dev branch is acceptable when local services are impractical (see `standards/local-development.md`). Supabase free tier only allows 2 projects, so stg piggybacks on prd via the anon key (already public/RLS-safe by design).
 
 ## Driver guidance (Neon)
 
 Use `postgres` (postgres.js) as the underlying driver, **not** `@neondatabase/serverless`.
 
-- `postgres` speaks standard Postgres wire protocol — works with both local containers and Neon connection strings, keeping local dev offline-capable.
-- `@neondatabase/serverless` uses Neon's websocket proxy, which **cannot connect to local Postgres**. It breaks the local-development standard.
+- `postgres` speaks standard Postgres wire protocol — works with both local containers and Neon connection strings, keeping all dev options open.
+- `@neondatabase/serverless` uses Neon's websocket proxy, which **cannot connect to local Postgres**. It locks you out of local dev entirely.
 - The websocket driver only matters for Edge Functions (no TCP). Since we use Fluid Compute (Node.js), standard TCP connections work fine.
 - When using Drizzle, pass the `postgres` client as the driver — Drizzle handles the rest identically for local and Neon.
 
