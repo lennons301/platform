@@ -12,7 +12,19 @@ All projects use Doppler as the canonical secrets store.
 2. Add secrets for each config: `dev` (local services), `stg` (remote non-prod), `prd` (production)
 3. For local development: `doppler setup` once per repo, then `doppler run -- <dev command>`
 4. For Interlude agents: generate a service token scoped to `stg`, set it on the project in Interlude
-5. For Vercel production: sync Doppler `prd` to Vercel env vars (or use Doppler's Vercel integration)
+
+### Vercel integration
+
+For projects hosted on Vercel, use the Doppler-Vercel integration to auto-sync secrets. This is the standard approach — never manually set env vars in Vercel that Doppler manages.
+
+1. In Doppler dashboard: **Integrations** > **Add Integration** > **Vercel**
+2. Authorise Doppler to access the Vercel account (one-time per Vercel team)
+3. Add sync mappings per project:
+   - Doppler `prd` → Vercel `Production`
+   - Doppler `stg` → Vercel `Preview`
+   - Do **not** sync `dev` (points at local services)
+4. Remove any manually-set env vars in Vercel that are now managed by Doppler
+5. Verify: trigger a preview deployment and confirm it builds successfully
 
 ## Conventions
 
