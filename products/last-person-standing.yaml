@@ -1,0 +1,34 @@
+name: last-person-standing
+description: Football survivor picks game — private games, team picks, elimination, prize pots
+category: product
+repo: lennons301/last-person-standing
+status: active
+package_manager: pnpm
+
+choices:
+  hosting: vercel-hobby
+  database: neon
+  auth: better-auth
+  orm: drizzle
+  ui: shadcn-tailwind
+  secrets: doppler
+  dev_environment: mise-just
+  linting: biome
+  observability: sentry
+  ci_cd: github-actions
+
+versions:
+  node: "22"
+  next: "16"
+  react: "19"
+  typescript: "5.7"
+
+architecture:
+  diagrams:
+    - context
+    - containers
+  staleness_paths:
+    - docker-compose.yml
+    - drizzle/
+
+divergences: []
