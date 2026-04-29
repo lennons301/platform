@@ -31,4 +31,44 @@ architecture:
     - docker-compose.yml
     - drizzle/
 
-divergences: []
+divergences:
+  - id: qstash-shared-credentials
+    standard: standards/environments.md
+    rule: "No environment's credentials should be usable in another"
+    deviation: |
+      Upstash QStash credentials (QSTASH_TOKEN, QSTASH_CURRENT_SIGNING_KEY,
+      QSTASH_NEXT_SIGNING_KEY) are shared across Doppler stg and prd configs.
+    reason: |
+      Modern Upstash QStash scopes credentials at the account level, not per
+      project — there is no "QStash project" concept within a single Upstash
+      account. True per-environment isolation requires two separate Upstash
+      accounts, which adds operational friction (separate logins, separate
+      billing) disproportionate to the risk for a hobby-tier single-developer
+      project.
+    mitigation: |
+      Re-evaluate when the project gains additional contributors or when a
+      paid Upstash tier becomes justified. Rotate keys on any suspicion of
+      compromise rather than scheduling cadence rotations.
+    decided: 2026-04-28
+    decided-by: Phase 4.5 brainstorm
+
+  - id: doppler-preview-manual-sync
+    standard: choices/secrets-provider.md
+    rule: "Doppler is the source of truth; sync to Vercel via the Doppler-Vercel integration"
+    deviation: |
+      Only Doppler `prd` is auto-synced to Vercel (Production env). Doppler
+      `stg` → Vercel Preview is NOT auto-synced; values are pushed manually
+      via `just sync-preview-env` (scripts/sync-preview-env.sh).
+    reason: |
+      Doppler free tier limits a workspace to 5 active config syncs across
+      all projects. With moontide (prd+stg), lemons (prd+stg), and
+      last-person-standing (prd) consuming all 5 slots, the
+      last-person-standing stg→Preview sync had to be sacrificed.
+    mitigation: |
+      `scripts/sync-preview-env.sh` (re-runnable) pushes Doppler stg → Vercel
+      Preview env on demand. Documented in AGENTS.md and discoverable via
+      `just sync-preview-env`. Rotate-and-push is a known maintenance step.
+      Re-evaluate if the workspace upgrades to Doppler Team plan (~$24/user/mo).
+    decided: 2026-04-28
+    decided-by: Phase 4.5 execution
+
