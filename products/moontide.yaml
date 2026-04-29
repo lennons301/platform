@@ -14,7 +14,7 @@ choices:
   secrets: doppler
   dev_environment: mise-just
   linting: biome
-  observability: sentry
+  observability: sentry-betterstack
   ci_cd: github-actions
 
 versions:
