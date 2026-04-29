@@ -46,3 +46,13 @@ divergences:
     reason: >
       Single VPS deployment. Doppler adds complexity with no benefit
       when there is one deploy target.
+  - standard: linting
+    choice: eslint
+    reason: >
+      Pending migration to Biome. Project still on the Next.js default ESLint
+      setup from scaffold; not yet prioritised over feature work.
+  - standard: dev-environment
+    choice: none
+    reason: >
+      Pending adoption of mise + just. Project currently relies on global
+      Node/pnpm installs and package.json scripts.
