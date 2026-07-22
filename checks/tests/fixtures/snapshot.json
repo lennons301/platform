@@ -1,0 +1,41 @@
+{
+  "generated_at": "2026-07-22T00:00:00Z",
+  "platform_commit": "abc1234",
+  "total_gaps": 3,
+  "total_products_checked": 2,
+  "products": [
+    {
+      "name": "alpha",
+      "repo": "example/alpha",
+      "category": "product",
+      "status": "active",
+      "checked": true,
+      "gap_count": 2,
+      "dimensions": [
+        {"dimension": "secrets", "status": "fail", "details": "not yet migrated to Doppler"},
+        {"dimension": "versions", "status": "fail", "details": "next: 15 → 16"},
+        {"dimension": "environments", "status": "divergence", "details": "intentional divergence"},
+        {"dimension": "documentation", "status": "pass", "details": ""}
+      ]
+    },
+    {
+      "name": "beta",
+      "repo": null,
+      "category": "product",
+      "status": "active",
+      "checked": true,
+      "gap_count": 1,
+      "dimensions": [
+        {"dimension": "secrets", "status": "fail", "details": "no doppler.yaml found"}
+      ]
+    },
+    {
+      "name": "gamma",
+      "repo": "example/gamma",
+      "category": "product",
+      "status": "active",
+      "checked": false,
+      "skip_reason": "repo not found"
+    }
+  ]
+}
