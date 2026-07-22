@@ -1,7 +1,7 @@
 {
-  "generated_at": "2026-07-22T06:53:54Z",
-  "platform_commit": "f049c03",
-  "total_gaps": 11,
+  "generated_at": "2026-07-22T06:59:10Z",
+  "platform_commit": "52e5be0",
+  "total_gaps": 10,
   "total_products_checked": 4,
   "products": [
     {
@@ -10,7 +10,7 @@
       "category": "infrastructure",
       "status": "active",
       "checked": true,
-      "gap_count": 5,
+      "gap_count": 4,
       "dimensions": [
         {
           "dimension": "architecture",
@@ -54,8 +54,8 @@
         },
         {
           "dimension": "testing",
-          "status": "fail",
-          "details": "no test command found (package.json scripts.test or justfile test recipe)"
+          "status": "pass",
+          "details": ""
         },
         {
           "dimension": "versions",
@@ -195,7 +195,7 @@
         {
           "dimension": "architecture",
           "status": "warn",
-          "details": "rendered/containers.svg missing (CI may not have run); rendered/context.svg missing (CI may not have run); diagrams may be stale (drizzle/ changed more recently)"
+          "details": "rendered/containers.svg missing (CI may not have run); rendered/context.svg missing (CI may not have run)"
         },
         {
           "dimension": "ci-cd",
