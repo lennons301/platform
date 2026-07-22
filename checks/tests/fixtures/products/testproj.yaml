@@ -1,0 +1,17 @@
+name: testproj
+description: Fixture project for snapshot tests
+category: product
+repo: example/testproj
+status: active
+package_manager: npm
+
+choices:
+  secrets: doppler
+
+versions:
+  node: "22"
+  next: "16"
+  react: "19"
+  typescript: "5.7"
+
+divergences: []
