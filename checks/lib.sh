@@ -75,3 +75,35 @@ resolve_context_file() {
     echo ""
   fi
 }
+
+# Check that jq is available
+require_jq() {
+  if ! command -v jq &> /dev/null; then
+    echo "ERROR: jq is required but not installed." >&2
+    echo "Install: https://jqlang.github.io/jq/download/" >&2
+    exit 1
+  fi
+}
+
+# Parse check output into TSV: dimension<TAB>status<TAB>details
+# Reads stdin, writes stdout. Non-matching lines are ignored.
+# Symbol mapping: ✓ -> pass, ✗ -> fail, ✓* -> divergence, ~ -> warn.
+# NOTE: this makes the check output line format a contract. If a check
+# script changes its output shape, update this parser and test-parse.sh.
+parse_check_output() {
+  local line dim sym details status
+  while IFS= read -r line; do
+    if [[ "$line" =~ ^[[:space:]][[:space:]]([a-z-]+):[[:space:]](✓\*|✓|✗|~)([[:space:]]\((.*)\))?$ ]]; then
+      dim="${BASH_REMATCH[1]}"
+      sym="${BASH_REMATCH[2]}"
+      details="${BASH_REMATCH[4]:-}"
+      case "$sym" in
+        "✓*") status="divergence" ;;
+        "✓")  status="pass" ;;
+        "✗")  status="fail" ;;
+        "~")  status="warn" ;;
+      esac
+      printf '%s\t%s\t%s\n' "$dim" "$status" "$details"
+    fi
+  done
+}
