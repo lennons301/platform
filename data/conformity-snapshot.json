@@ -1,0 +1,248 @@
+{
+  "generated_at": "2026-07-22T06:53:54Z",
+  "platform_commit": "f049c03",
+  "total_gaps": 11,
+  "total_products_checked": 4,
+  "products": [
+    {
+      "name": "interlude",
+      "repo": "lennons301/interlude",
+      "category": "infrastructure",
+      "status": "active",
+      "checked": true,
+      "gap_count": 5,
+      "dimensions": [
+        {
+          "dimension": "architecture",
+          "status": "fail",
+          "details": "no docs/architecture/ directory"
+        },
+        {
+          "dimension": "ci-cd",
+          "status": "fail",
+          "details": "no workflow triggers on pull_request"
+        },
+        {
+          "dimension": "dev-environment",
+          "status": "divergence",
+          "details": "intentional divergence"
+        },
+        {
+          "dimension": "documentation",
+          "status": "fail",
+          "details": "missing section: command missing section: stack|tech"
+        },
+        {
+          "dimension": "environments",
+          "status": "pass",
+          "details": ""
+        },
+        {
+          "dimension": "linting",
+          "status": "divergence",
+          "details": "intentional divergence"
+        },
+        {
+          "dimension": "local-development",
+          "status": "pass",
+          "details": ""
+        },
+        {
+          "dimension": "secrets",
+          "status": "divergence",
+          "details": "intentional divergence"
+        },
+        {
+          "dimension": "testing",
+          "status": "fail",
+          "details": "no test command found (package.json scripts.test or justfile test recipe)"
+        },
+        {
+          "dimension": "versions",
+          "status": "fail",
+          "details": "biome: unknown → 1"
+        }
+      ]
+    },
+    {
+      "name": "last-person-standing",
+      "repo": "lennons301/last-person-standing",
+      "category": "product",
+      "status": "active",
+      "checked": true,
+      "gap_count": 1,
+      "dimensions": [
+        {
+          "dimension": "architecture",
+          "status": "fail",
+          "details": "no docs/architecture/ directory"
+        },
+        {
+          "dimension": "ci-cd",
+          "status": "pass",
+          "details": ""
+        },
+        {
+          "dimension": "dev-environment",
+          "status": "pass",
+          "details": ""
+        },
+        {
+          "dimension": "documentation",
+          "status": "pass",
+          "details": ""
+        },
+        {
+          "dimension": "environments",
+          "status": "pass",
+          "details": ""
+        },
+        {
+          "dimension": "linting",
+          "status": "pass",
+          "details": ""
+        },
+        {
+          "dimension": "local-development",
+          "status": "pass",
+          "details": ""
+        },
+        {
+          "dimension": "secrets",
+          "status": "pass",
+          "details": ""
+        },
+        {
+          "dimension": "testing",
+          "status": "pass",
+          "details": ""
+        },
+        {
+          "dimension": "versions",
+          "status": "pass",
+          "details": ""
+        }
+      ]
+    },
+    {
+      "name": "lemons",
+      "repo": "lennons301/lemons",
+      "category": "product",
+      "status": "active",
+      "checked": true,
+      "gap_count": 5,
+      "dimensions": [
+        {
+          "dimension": "architecture",
+          "status": "fail",
+          "details": "no docs/architecture/ directory"
+        },
+        {
+          "dimension": "ci-cd",
+          "status": "fail",
+          "details": "no workflow triggers on pull_request"
+        },
+        {
+          "dimension": "dev-environment",
+          "status": "fail",
+          "details": "no version-manager config (.mise.toml or .tool-versions) no justfile (dev_environment=mise-just)"
+        },
+        {
+          "dimension": "documentation",
+          "status": "pass",
+          "details": ""
+        },
+        {
+          "dimension": "environments",
+          "status": "pass",
+          "details": ""
+        },
+        {
+          "dimension": "linting",
+          "status": "fail",
+          "details": "no biome.json (linting=biome) no pre-commit hook (.husky/pre-commit, .pre-commit-config.yaml, or lefthook.yml)"
+        },
+        {
+          "dimension": "local-development",
+          "status": "pass",
+          "details": ""
+        },
+        {
+          "dimension": "secrets",
+          "status": "pass",
+          "details": ""
+        },
+        {
+          "dimension": "testing",
+          "status": "pass",
+          "details": ""
+        },
+        {
+          "dimension": "versions",
+          "status": "fail",
+          "details": "pnpm: unknown → 9 biome: unknown → 1 drizzle-kit: unknown → 0.30"
+        }
+      ]
+    },
+    {
+      "name": "moontide",
+      "repo": "lennons301/moontide",
+      "category": "product",
+      "status": "active",
+      "checked": true,
+      "gap_count": 0,
+      "dimensions": [
+        {
+          "dimension": "architecture",
+          "status": "warn",
+          "details": "rendered/containers.svg missing (CI may not have run); rendered/context.svg missing (CI may not have run); diagrams may be stale (drizzle/ changed more recently)"
+        },
+        {
+          "dimension": "ci-cd",
+          "status": "pass",
+          "details": ""
+        },
+        {
+          "dimension": "dev-environment",
+          "status": "pass",
+          "details": ""
+        },
+        {
+          "dimension": "documentation",
+          "status": "pass",
+          "details": ""
+        },
+        {
+          "dimension": "environments",
+          "status": "pass",
+          "details": ""
+        },
+        {
+          "dimension": "linting",
+          "status": "pass",
+          "details": ""
+        },
+        {
+          "dimension": "local-development",
+          "status": "pass",
+          "details": ""
+        },
+        {
+          "dimension": "secrets",
+          "status": "pass",
+          "details": ""
+        },
+        {
+          "dimension": "testing",
+          "status": "pass",
+          "details": ""
+        },
+        {
+          "dimension": "versions",
+          "status": "pass",
+          "details": ""
+        }
+      ]
+    }
+  ]
+}

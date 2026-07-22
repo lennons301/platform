@@ -71,10 +71,23 @@ for product_yaml in "$PRODUCTS_DIR"/*.yaml; do
   TOTAL_GAPS=$((TOTAL_GAPS + gaps))
 
   if [ -n "$JSON_OUT" ]; then
+    # Some checks emit multiple lines for one dimension (e.g. several
+    # architecture warnings) — merge to one entry per dimension: worst
+    # status wins (fail > warn > divergence > pass), details joined.
     dims=$(echo "$output" | parse_check_output | jq -R -s '
       split("\n")
       | map(select(length > 0) | split("\t")
-        | {dimension: .[0], status: .[1], details: .[2]})')
+        | {dimension: .[0], status: .[1], details: .[2]})
+      | group_by(.dimension)
+      | map({
+          dimension: .[0].dimension,
+          status: ([.[].status]
+            | if index("fail") then "fail"
+              elif index("warn") then "warn"
+              elif index("divergence") then "divergence"
+              else "pass" end),
+          details: ([.[].details | select(length > 0)] | join("; "))
+        })')
     PRODUCT_DOCS+=("$(jq -n \
       --arg name "$name" --arg repo "$repo" \
       --arg category "$category" --arg status "$status" \
