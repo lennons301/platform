@@ -31,7 +31,13 @@ docs/                — presentations and design specs
 ./checks/check-all.sh <project-path> <product-yaml-path>
 
 # Run conformity checks across the entire estate
-./checks/check-estate.sh [--repos-dir <path>]
+./checks/check-estate.sh [--repos-dir <path>] [--json <snapshot-path>]
+
+# File GitHub Issues for gaps recorded in the snapshot
+./checks/create-issues.sh [--dry-run] [--snapshot <path>]
+
+# Run the shell test suite for the check tooling
+./checks/tests/run-tests.sh
 
 # Individual checks
 ./checks/check-documentation.sh <project-path> <product-yaml>
@@ -54,6 +60,8 @@ docs/                — presentations and design specs
 - Version targets are floors, not pins (actual >= target is conformant)
 - Templates use `{{PLACEHOLDER}}` syntax for project-specific values
 - Agent context lives in `AGENTS.md` (agent-agnostic); `CLAUDE.md` references it via `@AGENTS.md`
+- Check output line format (`  <dim>: ✓|✗|✓* (details)`) is a parsed contract — changes require updating `parse_check_output` in checks/lib.sh and checks/tests/test-parse.sh
+- `data/conformity-snapshot.json` is the machine-readable contract between checks, create-issues.sh, and the planned estate dashboard
 
 ## Platform Context
 

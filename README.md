@@ -9,6 +9,7 @@ Estate-wide standards, choices, product registry, and conformity checks.
 - `versions/manifest.yaml` — Target runtime/framework versions for the estate
 - `products/` — One YAML file per product (metadata, choices, versions, divergences)
 - `checks/` — Shell scripts that audit projects against standards and the manifest
+- `data/conformity-snapshot.json` — Machine-readable conformity snapshot (CI-committed; consumed by create-issues and the planned estate dashboard)
 - `templates/` — Starter files for new projects
 
 ## Quick start
@@ -17,11 +18,18 @@ Estate-wide standards, choices, product registry, and conformity checks.
 # Run conformity checks against all local projects
 ./checks/check-estate.sh
 
+# ...and also emit the machine-readable snapshot
+./checks/check-estate.sh --json data/conformity-snapshot.json
+
 # Check a single project
 ./checks/check-all.sh ~/code/lemons products/lemons.yaml
 
-# Create GitHub Issues for gaps
-./checks/create-issues.sh
+# Create GitHub Issues for gaps (reads the snapshot)
+./checks/create-issues.sh --dry-run   # preview
+./checks/create-issues.sh             # file them
+
+# Run the shell test suite
+./checks/tests/run-tests.sh
 ```
 
 ## For agents

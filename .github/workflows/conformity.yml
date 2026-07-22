@@ -2,6 +2,12 @@ name: Estate Conformity Check
 on:
   push:
     branches: [main, master]
+  schedule:
+    - cron: '0 6 * * *'   # daily 06:00 UTC — catches drift without a platform push
+  workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   check:
@@ -14,6 +20,10 @@ jobs:
           sudo wget -qO /usr/local/bin/yq \
             https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
           sudo chmod +x /usr/local/bin/yq
+        # jq is preinstalled on ubuntu-latest runners
+
+      - name: Run shell tests
+        run: ./checks/tests/run-tests.sh
 
       - name: Clone product repos
         run: |
@@ -28,10 +38,28 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
 
-      - name: Run conformity checks
-        run: ./checks/check-estate.sh --repos-dir /tmp/repos
+      - name: Run conformity checks and emit snapshot
+        run: |
+          mkdir -p data
+          ./checks/check-estate.sh --repos-dir /tmp/repos --json data/conformity-snapshot.json
+
+      - name: Commit snapshot if semantically changed
+        run: |
+          # Ignore generated_at/platform_commit churn — only commit when the
+          # conformity content actually changed.
+          if git show HEAD:data/conformity-snapshot.json > /tmp/old-snapshot.json 2>/dev/null && \
+             [ "$(jq -S 'del(.generated_at, .platform_commit)' /tmp/old-snapshot.json)" = \
+               "$(jq -S 'del(.generated_at, .platform_commit)' data/conformity-snapshot.json)" ]; then
+            echo "No semantic change to snapshot; skipping commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/conformity-snapshot.json
+          git commit -m "chore: update conformity snapshot [skip ci]"
+          git push
 
       - name: Create issues for gaps
-        run: ./checks/create-issues.sh --repos-dir /tmp/repos
+        run: ./checks/create-issues.sh --snapshot data/conformity-snapshot.json
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
