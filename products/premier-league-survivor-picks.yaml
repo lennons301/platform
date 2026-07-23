@@ -6,6 +6,7 @@ status: archived
 package_manager: npm
 
 choices:
+  ai_workflow: superpowers
   hosting: vercel-hobby
   database: supabase
   auth: supabase-auth

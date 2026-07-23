@@ -6,6 +6,7 @@ status: active
 package_manager: pnpm
 
 choices:
+  ai_workflow: superpowers
   hosting: vercel-hobby
   database: neon
   auth: better-auth

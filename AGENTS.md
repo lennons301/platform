@@ -49,6 +49,10 @@ docs/                — presentations and design specs
 # Sync global Claude Code instructions from this repo to ~/.claude/CLAUDE.md
 ./scripts/sync-claude-md.sh           # interactive (shows diff, prompts)
 ./scripts/sync-claude-md.sh --force   # non-interactive
+
+# Run one agent attempt on one ready-for-agent issue of a project repo
+# (see choices/ai-dev-workflow.md for the full ticket-loop workflow)
+./scripts/ticket-loop.sh --repo-dir <project-path> [--issue N] [--afk]
 ```
 
 ## Key Conventions
@@ -60,6 +64,8 @@ docs/                — presentations and design specs
 - Version targets are floors, not pins (actual >= target is conformant)
 - Templates use `{{PLACEHOLDER}}` syntax for project-specific values
 - Agent context lives in `AGENTS.md` (agent-agnostic); `CLAUDE.md` references it via `@AGENTS.md`
+- The estate's AI dev workflow is a per-product choice (`choices.ai_workflow`):
+  `ticket-loop` (default — see `choices/ai-dev-workflow.md`) or `superpowers` (legacy)
 - Check output line format (`  <dim>: ✓|✗|✓* (details)`) is a parsed contract — changes require updating `parse_check_output` in checks/lib.sh and checks/tests/test-parse.sh
 - `data/conformity-snapshot.json` is the machine-readable contract between checks, create-issues.sh, and the planned estate dashboard
 
