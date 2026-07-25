@@ -1,7 +1,7 @@
 {
-  "generated_at": "2026-07-24T08:46:44Z",
-  "platform_commit": "062dcbc",
-  "total_gaps": 11,
+  "generated_at": "2026-07-25T07:50:31Z",
+  "platform_commit": "2bbff86",
+  "total_gaps": 10,
   "total_products_checked": 4,
   "products": [
     {
@@ -130,7 +130,7 @@
       "category": "product",
       "status": "active",
       "checked": true,
-      "gap_count": 6,
+      "gap_count": 5,
       "dimensions": [
         {
           "dimension": "architecture",
@@ -149,8 +149,8 @@
         },
         {
           "dimension": "documentation",
-          "status": "fail",
-          "details": "no AGENTS.md — see standards/agent-context.md"
+          "status": "pass",
+          "details": ""
         },
         {
           "dimension": "environments",
