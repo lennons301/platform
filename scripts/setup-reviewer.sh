@@ -52,7 +52,9 @@ echo "==> Onboarding $NWO (default branch: $DEFAULT_BRANCH) for reviewer $REVIEW
 
 # --- 1. Branch protection (merge, don't clobber) -------------------------------
 
-EXISTING="$(gh api "repos/$NWO/branches/$DEFAULT_BRANCH/protection" 2>/dev/null || echo '{}')"
+# NB: gh api prints the error body to stdout even on HTTP 404, so on failure
+# the variable must be overwritten, not defaulted inside the substitution.
+EXISTING="$(gh api "repos/$NWO/branches/$DEFAULT_BRANCH/protection" 2>/dev/null)" || EXISTING='{}'
 
 PAYLOAD="$(jq -n --argjson existing "$EXISTING" '
   {

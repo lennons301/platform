@@ -6,7 +6,7 @@ status: active
 package_manager: npm
 
 choices:
-  ai_workflow: superpowers
+  ai_workflow: ticket-loop
   hosting: vercel-hobby
   database: supabase
   auth: supabase-auth
