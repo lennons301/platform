@@ -110,7 +110,12 @@ echo "==> Worktree: $WORKTREE"
 # --- Implement pass ----------------------------------------------------------
 # Fresh claude process, fresh context. The ticket is the spec.
 
-IMPLEMENT_FLAGS=(--permission-mode acceptEdits)
+# Non-interactive sessions can't answer permission prompts, so pre-approve
+# what the loop's contract requires: pushing the branch and running the
+# repo's checks under doppler-injected env. (Prompting on git push while gh
+# api writes are allowed was cosmetic anyway — same capability.)
+IMPLEMENT_FLAGS=(--permission-mode acceptEdits
+  --allowedTools "Bash(git push:*),Bash(doppler run:*)")
 [ -n "$AFK" ] && IMPLEMENT_FLAGS=(--dangerously-skip-permissions)
 
 (cd "$WORKTREE" && claude -p "${IMPLEMENT_FLAGS[@]}" "
