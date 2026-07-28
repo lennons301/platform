@@ -18,7 +18,8 @@ choices/             — current tool selections with decision matrices
 products/            — per-project YAML registry (choices, versions, divergences)
 versions/            — runtime/framework version manifest
 checks/              — conformity check scripts (shell)
-templates/           — starter files for new projects
+templates/           — starter files for new projects; templates/agents/ holds
+                       canonical agent definitions synced via scripts/sync-agents.sh
 scripts/             — setup and sync utilities
 .github/workflows/   — CI automation (estate-wide conformity audits)
 docs/                — presentations and design specs

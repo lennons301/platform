@@ -85,6 +85,10 @@ exactly one free machine account per person.
 | `REVIEWER_DOPPLER_PROJECT` / `_CONFIG` | `platform` / `prd` |
 | `REVIEWER_DOPPLER_SECRET` | `REVIEWER_GH_TOKEN` |
 
+**Status:** estate setup complete (2026-07-28) — account created, PAT minted
+and stored in Doppler. No repos onboarded yet: run `scripts/setup-reviewer.sh`
+per repo as it adopts the loop.
+
 **One-time estate setup (manual, ~10 min):**
 
 1. Create the machine account: ordinary GitHub signup as `lennons301-reviewer`.
