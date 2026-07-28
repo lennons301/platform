@@ -50,9 +50,16 @@ docs/                — presentations and design specs
 ./scripts/sync-claude-md.sh           # interactive (shows diff, prompts)
 ./scripts/sync-claude-md.sh --force   # non-interactive
 
+# Sync canonical agent definitions (templates/agents/) to ~/.claude/agents/
+./scripts/sync-agents.sh [--force]
+
 # Run one agent attempt on one ready-for-agent issue of a project repo
 # (see choices/ai-dev-workflow.md for the full ticket-loop workflow)
 ./scripts/ticket-loop.sh --repo-dir <project-path> [--issue N] [--afk]
+
+# Onboard a repo to the separate-reviewer-identity flow (idempotent):
+# branch protection, auto-merge, human-signoff label, reviewer collaborator
+./scripts/setup-reviewer.sh --repo-dir <project-path>
 ```
 
 ## Key Conventions
@@ -66,6 +73,13 @@ docs/                — presentations and design specs
 - Agent context lives in `AGENTS.md` (agent-agnostic); `CLAUDE.md` references it via `@AGENTS.md`
 - The estate's AI dev workflow is a per-product choice (`choices.ai_workflow`):
   `ticket-loop` (default — see `choices/ai-dev-workflow.md`) or `superpowers` (legacy)
+- Ticket-loop PRs auto-merge on reviewer approval unless a deterministic review
+  gate matches (`standards/review-gates.yaml` + per-repo
+  `docs/agents/review-gates.yaml`, evaluated by `scripts/review-gates-lib.sh`);
+  gated PRs carry the `human-signoff` label and wait for a human merge
+- The review pass runs as the reviewer machine account; its PAT lives in
+  Doppler (`platform`/`prd`/`REVIEWER_GH_TOKEN`) — see "Reviewer identity &
+  onboarding" in `choices/ai-dev-workflow.md`
 - Check output line format (`  <dim>: ✓|✗|✓* (details)`) is a parsed contract — changes require updating `parse_check_output` in checks/lib.sh and checks/tests/test-parse.sh
 - `data/conformity-snapshot.json` is the machine-readable contract between checks, create-issues.sh, and the planned estate dashboard
 

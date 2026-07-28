@@ -1,0 +1,31 @@
+# Deterministic human-sign-off gates — estate default.
+# A PR whose changed paths match ANY glob below is never auto-merged: the
+# ticket-loop runner labels it `human-signoff` and leaves auto-merge disarmed.
+# Evaluated by scripts/review-gates-lib.sh (bash glob semantics: '*' crosses
+# '/', a leading '**/' also matches at the repo root).
+#
+# Repos extend (never shrink) this list via docs/agents/review-gates.yaml.
+# Tuning loop: a gate that keeps firing on changes you'd happily auto-land →
+# delete the glob; a bad auto-merge → add one. See standards/review-gates.md.
+human_signoff:
+  visual-ui:
+    - "**/*.css"
+    - "**/*.scss"
+    - "**/tailwind.config.*"
+    - "**/components/**"
+    - "**/app/**/page.*"
+    - "**/app/**/layout.*"
+    - "**/pages/**"
+  data-migrations:
+    - "**/migrations/**"
+    - "**/*.sql"
+    - "**/schema.prisma"
+  auth:
+    - "**/auth/**"
+    - "**/middleware.*"
+  ci-secrets:
+    - ".github/workflows/**"
+    - "**/.env*"
+    - "**/doppler.yaml"
+    # the gate config is itself a gate: a PR must not un-gate itself
+    - "**/review-gates.yaml"

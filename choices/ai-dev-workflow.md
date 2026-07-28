@@ -51,15 +51,67 @@ vocabulary, and where `CONTEXT.md`/ADRs live (writes `docs/agents/`).
   commit → open PR linking the issue. Stuck after ~3 attempts → stop and
   label `ready-for-human` rather than thrash.
 - The agent never grades its own work. Done = objective signals pass (tests,
-  lint, CI) **and** a separate reviewer agent — fresh context, reviewing
-  against repo standards and the originating ticket — approves the PR. The
-  `ticket-reviewer` agent definition lives at `~/.claude/agents/`.
+  lint, CI) **and** a separate reviewer agent — fresh context, fresh GitHub
+  identity, reviewing against repo standards and the originating ticket —
+  approves the PR. The `ticket-reviewer` agent definition is canonical at
+  `templates/agents/` in this repo and synced to `~/.claude/agents/` via
+  `scripts/sync-agents.sh`.
+- Whether an approval may *land* the PR is decided deterministically, not by
+  the reviewer: the runner matches changed paths against
+  `standards/review-gates.yaml` (+ the repo's `docs/agents/review-gates.yaml`
+  extension). No match → auto-merge armed (squash); approval lands it. Match →
+  `human-signoff` label, auto-merge off; a human merges after looking. See
+  `standards/review-gates.md`.
 - Parallelism = several independent loops in separate worktrees, not an
   orchestrating agent. Subagents are for narrow fan-out (research, scanning)
   only.
 - Thin runner: `scripts/ticket-loop.sh` in this repo picks up one
-  `ready-for-agent` issue, runs the implement pass in a worktree, then the
-  review pass with fresh context.
+  `ready-for-agent` issue, runs the implement pass in a worktree, evaluates
+  the review gates, then runs the review pass with fresh context under the
+  reviewer identity.
+
+## Reviewer identity & onboarding
+
+The review pass runs as a dedicated GitHub **machine account** so its
+approvals are accepted (GitHub rejects self-approval) and can trigger
+auto-merge. One account serves the whole estate — GitHub's ToS permits
+exactly one free machine account per person.
+
+**Defaults** (override via env vars of the same names in the scripts):
+
+| Setting | Value |
+|---|---|
+| `REVIEWER_LOGIN` | `lennons301-reviewer` |
+| `REVIEWER_DOPPLER_PROJECT` / `_CONFIG` | `platform` / `prd` |
+| `REVIEWER_DOPPLER_SECRET` | `REVIEWER_GH_TOKEN` |
+
+**One-time estate setup (manual, ~10 min):**
+
+1. Create the machine account: ordinary GitHub signup as `lennons301-reviewer`.
+   A plus-addressed email (`you+reviewer@…`) works — GitHub treats it as
+   distinct.
+2. Enable 2FA (mandatory); store the TOTP secret next to the PAT (password
+   manager or a second Doppler secret) so a lost device can't strand the
+   account.
+3. Mint a **classic** PAT with `repo` scope. Classic, not fine-grained:
+   fine-grained PATs cannot reach collaborator repos owned by a different
+   personal account. Reach stays bounded by collaborator invites.
+4. Store it: `doppler secrets set REVIEWER_GH_TOKEN --project platform --config prd`
+
+**Per-machine bootstrap:** install the Doppler CLI and `doppler login`
+(plus the usual `gh auth login` and `claude` setup). Nothing else to copy —
+the runner fetches the PAT at review time, and exports it only around the
+review pass.
+
+**Per-repo onboarding:** `./scripts/setup-reviewer.sh --repo-dir ~/code/<repo>`
+(idempotent). It sets branch protection (1 approving review, stale approvals
+dismissed on push — existing rules preserved), enables auto-merge, creates the
+`human-signoff` label, seeds `docs/agents/review-gates.yaml` (commit it), and
+invites + accepts the reviewer as a write collaborator.
+
+**Finding gated PRs:** `gh pr list --label human-signoff --state open` in any
+repo. Approve and merge when satisfied; the reviewer's comment-review explains
+what it verified.
 
 ## Workflows per ticket
 
@@ -88,7 +140,12 @@ fuzzy initiative.
 
 - **Prompt injection** — autonomous agents read issue bodies as instructions.
   Restrict who can create/label issues on any repo running unattended agents;
-  outside contributors must not be able to reach `ready-for-agent`.
+  outside contributors must not be able to reach `ready-for-agent`. With
+  auto-merge live this is a hard requirement, not advice: whoever can label an
+  issue `ready-for-agent` can cause code to land unattended. The deterministic
+  gates (`standards/review-gates.yaml`) are the owner's mechanical control
+  surface — a PR can never widen its own gates (the extension file is read
+  from the default branch and is itself gated).
 - **Skills are advisory** — the hard gates are tests, the reviewer agent, and
   branch protection, not the markdown.
 - **Don't double-plan** — a generated ticket *is* the spec. No second planning
