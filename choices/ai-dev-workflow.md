@@ -117,6 +117,30 @@ invites + accepts the reviewer as a write collaborator.
 repo. Approve and merge when satisfied; the reviewer's comment-review explains
 what it verified.
 
+### Human parity (solo developer)
+
+This estate has one developer. The reviewer identity exists to **enable
+automation, never to gate the human out**: every outcome the automation can
+produce must remain achievable by the owner alone, in the GitHub UI. That
+holds because `setup-reviewer.sh` leaves `enforce_admins` **off** — the admin
+bypass is the guaranteed human path.
+
+| Situation | Solo human path |
+|---|---|
+| Own/manual PR, no reviewer ran | Admin bypass merge (red button + confirm — explicit, but one click) |
+| Agent PR, armed | Auto-merges on reviewer approval; or merge/bypass yourself anytime |
+| Agent PR, gated (`human-signoff`) | Reviewer already approved — normal green merge button |
+| Reviewer requested changes, you disagree | Dismiss its review (write access) or bypass-merge; your call is final |
+| Reviewer broken (Doppler down, PAT revoked) | Bypass merge — automation degrades, the human path never blocks |
+
+GitHub never lets a PR author approve their own PR, so "1 required review"
+can only be satisfied by the reviewer account — for a solo developer the
+admin bypass **is** the human review, not a workaround. Corollary: do NOT
+enable `enforce_admins` (include administrators) on ticket-loop repos — with
+one human it makes solo merging impossible. `setup-reviewer.sh` preserves it
+where it already exists and warns; either accept reviewer-approval-then-merge
+as your only path there, or turn it off.
+
 ## Workflows per ticket
 
 1. **The menu** — default workflows live in the repo as named, versioned files

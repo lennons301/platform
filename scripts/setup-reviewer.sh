@@ -76,6 +76,14 @@ echo "$PAYLOAD" | gh api -X PUT "repos/$NWO/branches/$DEFAULT_BRANCH/protection"
   --input - > /dev/null
 echo "==> Branch protection: 1 approving review required, stale approvals dismissed (existing checks preserved)"
 
+if [ "$(echo "$PAYLOAD" | jq -r .enforce_admins)" = "true" ]; then
+  echo "==> WARNING: enforce_admins is ON for this repo (pre-existing; preserved)." >&2
+  echo "    A solo developer cannot bypass-merge here: every PR needs the reviewer's" >&2
+  echo "    approval before a human can merge. This breaks human parity — see" >&2
+  echo "    'Human parity' in choices/ai-dev-workflow.md. Turn it off to restore" >&2
+  echo "    the solo path, or accept reviewer-approval-then-merge as the only flow." >&2
+fi
+
 # --- 2. Auto-merge repo setting -------------------------------------------------
 
 gh api -X PATCH "repos/$NWO" -F allow_auto_merge=true > /dev/null

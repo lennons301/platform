@@ -11,6 +11,11 @@ real gate — and it is made deterministically: the runner diffs the PR's
 changed paths against declared globs (`standards/review-gates.yaml`). Agentic
 judgement may add human review on top; it can never remove it.
 
+Gates route work *to* a human; they never require a second one. Every outcome
+the automation produces must remain achievable by the estate owner alone in
+the GitHub UI (see "Human parity" in `choices/ai-dev-workflow.md`) — which is
+why ticket-loop repos keep `enforce_admins` off.
+
 ## Requirements
 
 1. The estate-default gate globs live in `standards/review-gates.yaml`,
