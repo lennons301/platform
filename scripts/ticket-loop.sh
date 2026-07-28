@@ -118,7 +118,9 @@ IMPLEMENT_FLAGS=(--permission-mode acceptEdits
   --allowedTools "Bash(git push:*),Bash(doppler run:*)")
 [ -n "$AFK" ] && IMPLEMENT_FLAGS=(--dangerously-skip-permissions)
 
-(cd "$WORKTREE" && claude -p "${IMPLEMENT_FLAGS[@]}" "
+# NB: prompt must come BEFORE the flags — --allowedTools is variadic and
+# would swallow a trailing prompt as another tool pattern.
+(cd "$WORKTREE" && claude -p "
 Work GitHub issue #$ISSUE of this repo. This is attempt $ATTEMPT of $MAX_ATTEMPTS.
 
 1. Read the issue in full (gh issue view $ISSUE --comments). The ticket is the
@@ -134,7 +136,7 @@ Work GitHub issue #$ISSUE of this repo. This is attempt $ATTEMPT of $MAX_ATTEMPT
    with 'Closes #$ISSUE'. If a PR for this branch already exists, push to it.
 6. If you are genuinely blocked (missing decision, contradictory spec),
    comment your findings on issue #$ISSUE, label it ready-for-human, and stop.
-")
+" "${IMPLEMENT_FLAGS[@]}")
 
 PR="$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number // empty')"
 if [ -z "$PR" ]; then
