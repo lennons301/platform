@@ -43,10 +43,13 @@ divergences:
       Development platform needs Docker daemon access and persistent containers.
       Serverless hosting is architecturally incompatible.
   - standard: secrets
-    choice: env-file
+    choice: doppler
     reason: >
-      Single VPS deployment. Doppler adds complexity with no benefit
-      when there is one deploy target.
+      Migrated off the env-file divergence 2026-07-28 (Phase 4). Orchestrator
+      secrets live in Doppler project `interlude` (dev = local, prd = VPS); the
+      app boots via `doppler run`, with only a prd service token (DOPPLER_TOKEN)
+      on the VPS. Aligns with the platform standard and the Doppler already used
+      for agent-container secrets.
   - standard: linting
     choice: eslint
     reason: >
