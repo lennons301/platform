@@ -27,7 +27,7 @@
 #                  the implement pass. Only for repos where issue creation and
 #                  labelling are restricted to you (prompt-injection caution).
 #
-# Requires: gh (authenticated), git, claude, yq, doppler (logged in; the
+# Requires: gh (authenticated), git, claude, yq, jq, doppler (logged in; the
 # reviewer PAT lives in Doppler — see 'Reviewer identity & onboarding' in
 # choices/ai-dev-workflow.md). Onboard a repo with scripts/setup-reviewer.sh.
 
@@ -60,7 +60,45 @@ done
 
 cd "$REPO_DIR"
 git rev-parse --git-dir > /dev/null || { echo "Not a git repo: $REPO_DIR" >&2; exit 1; }
-REPO_NAME="$(basename "$(git rev-parse --show-toplevel)")"
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+REPO_NAME="$(basename "$REPO_ROOT")"
+
+# --- Permission preflight ------------------------------------------------------
+# The implement pass pre-approves git push / doppler run via --allowedTools,
+# but permission rules evaluate deny -> ask -> allow with the FIRST match
+# winning: an ask/deny rule covering those commands beats any allow from any
+# source, and a non-interactive pass cannot answer an ask prompt, so the push
+# dies mid-run (worktree sessions resolve .claude/settings*.json to this
+# checkout). Fail fast naming the offending rule instead.
+if [ -z "$AFK" ]; then  # --afk skips permissions entirely, nothing can block it
+  command -v jq > /dev/null || { echo "ERROR: jq is required." >&2; exit 1; }
+  BLOCKING=""
+  for SETTINGS in "$HOME/.claude/settings.json" \
+                  "$REPO_ROOT/.claude/settings.json" \
+                  "$REPO_ROOT/.claude/settings.local.json"; do
+    [ -f "$SETTINGS" ] || continue
+    while IFS= read -r RULE; do
+      PREFIX="${RULE#Bash(}"; PREFIX="${PREFIX%)}"; PREFIX="${PREFIX%":*"}"
+      if [ "$RULE" = "Bash" ] || [ "$PREFIX" = "*" ]; then
+        BLOCKING+="$SETTINGS: $RULE"$'\n'
+        continue
+      fi
+      for NEED in "git push" "doppler run"; do
+        case "$NEED" in "$PREFIX"*) BLOCKING+="$SETTINGS: $RULE"$'\n'; continue 2 ;; esac
+        case "$PREFIX" in "$NEED"*) BLOCKING+="$SETTINGS: $RULE"$'\n'; continue 2 ;; esac
+      done
+    done < <(jq -r '((.permissions.ask // []) + (.permissions.deny // []))[]
+                    | select(. == "Bash" or startswith("Bash("))' "$SETTINGS" 2>/dev/null)
+  done
+  if [ -n "$BLOCKING" ]; then
+    echo "==> ERROR: ask/deny permission rules would block the implement pass's git push / doppler run:" >&2
+    printf '%s' "$BLOCKING" | sed 's/^/    /' >&2
+    echo "    These beat --allowedTools (deny -> ask -> allow, first match wins), and a" >&2
+    echo "    non-interactive pass cannot answer an ask prompt. Remove or relax the rule(s)," >&2
+    echo "    or run with --afk. See 'Per-repo onboarding' in choices/ai-dev-workflow.md." >&2
+    exit 1
+  fi
+fi
 
 # --- Pick a ticket -----------------------------------------------------------
 
@@ -83,7 +121,10 @@ ATTEMPT=$(( $(gh issue view "$ISSUE" --comments --json comments \
 
 if [ "$ATTEMPT" -gt "$MAX_ATTEMPTS" ]; then
   echo "Issue #$ISSUE already has $((ATTEMPT - 1)) attempts. Flagging for a human."
-  gh issue edit "$ISSUE" --remove-label ready-for-agent --add-label ready-for-human
+  # Label ops use REST: gh's GraphQL editors (gh pr/issue edit) query the
+  # sunset projectCards field and error out (observed 2026-07-28, gh 2.45).
+  gh api "repos/{owner}/{repo}/issues/$ISSUE/labels" -f 'labels[]=ready-for-human' > /dev/null
+  gh api -X DELETE "repos/{owner}/{repo}/issues/$ISSUE/labels/ready-for-agent" > /dev/null || true
   gh issue comment "$ISSUE" --body "🤖 $((ATTEMPT - 1)) agent attempts without an approved PR — flagging ready-for-human."
   exit 1
 fi
@@ -172,8 +213,9 @@ if [ "$GATE_RC" -eq 0 ]; then
   echo "==> Review gate matched — human sign-off required, auto-merge stays off."
   echo "$GATE_MATCHES" | sed 's/^/    /'
   gh pr merge --disable-auto "$PR" > /dev/null 2>&1 || true
-  gh pr edit "$PR" --add-label human-signoff > /dev/null 2>&1 \
-    || echo "==> WARNING: could not apply human-signoff label — has this repo run scripts/setup-reviewer.sh?"
+  # REST, not gh pr edit — see the projectCards note above.
+  gh api "repos/{owner}/{repo}/issues/$PR/labels" -f 'labels[]=human-signoff' > /dev/null 2>&1 \
+    || echo "==> WARNING: could not apply human-signoff label — does it exist? (scripts/setup-reviewer.sh creates it)"
   gh pr comment "$PR" --body "🔒 Deterministic review gate matched — auto-merge disarmed; a human merges after review.
 
 | gate | glob | path |

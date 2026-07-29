@@ -113,6 +113,16 @@ dismissed on push — existing rules preserved), enables auto-merge, creates the
 `human-signoff` label, seeds `docs/agents/review-gates.yaml` (commit it), and
 invites + accepts the reviewer as a write collaborator.
 
+**Repo permission rules:** the implement pass pre-approves `git push` and
+`doppler run` via `--allowedTools`, but Claude Code evaluates permission rules
+deny → ask → allow with the *first match winning* — an `ask`/`deny` rule in
+the repo's `.claude/settings.json` or `.claude/settings.local.json` (worktree
+sessions resolve these to the main checkout) beats any allow from any source,
+and a non-interactive pass cannot answer an ask prompt, so the push dies
+mid-run. `ticket-loop.sh` preflights these files (plus `~/.claude/settings.json`)
+and fails fast naming the offending rule; remove or relax it before onboarding
+a repo, or run `--afk` (which skips permissions entirely).
+
 **Finding gated PRs:** `gh pr list --label human-signoff --state open` in any
 repo. Approve and merge when satisfied; the reviewer's comment-review explains
 what it verified.
