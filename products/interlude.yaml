@@ -6,11 +6,11 @@ status: active
 package_manager: pnpm
 
 choices:
-  ai_workflow: superpowers
+  ai_workflow: ticket-loop
   hosting: self-hosted-hetzner
   database: sqlite
   auth: none
-  secrets: env-file
+  secrets: doppler
   ui: shadcn-tailwind
   dev_environment: mise-just
   linting: biome
@@ -42,11 +42,6 @@ divergences:
     reason: >
       Development platform needs Docker daemon access and persistent containers.
       Serverless hosting is architecturally incompatible.
-  - standard: secrets
-    choice: env-file
-    reason: >
-      Single VPS deployment. Doppler adds complexity with no benefit
-      when there is one deploy target.
   - standard: linting
     choice: eslint
     reason: >
