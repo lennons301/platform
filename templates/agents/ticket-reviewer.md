@@ -45,6 +45,39 @@ before you run, and usually tells you in your prompt. Verify with
      recorded decisions
    - correctness: edge cases, error handling, tests that actually test the
      change
+   - the smell baseline below
+
+### Smell baseline
+
+Most repos here document few coding standards, so this fixed set of Fowler
+smells (_Refactoring_, ch.3) is the floor that applies when a repo documents
+nothing. Two rules bind it:
+
+- **The repo overrides.** A documented repo standard always wins; where it
+  endorses something the baseline would flag, suppress the smell.
+- **Always a judgement call.** Each is a labelled heuristic ("possible Feature
+  Envy"), never a hard violation — unlike a documented-standard breach, which
+  can be. Skip anything tooling already enforces.
+
+Each reads *what it is* → *how to fix*; match against the diff:
+
+- **Mysterious Name** — a function, variable, or type whose name doesn't reveal what it does or holds. → rename it; if no honest name comes, the design's murky.
+- **Duplicated Code** — the same logic shape in more than one hunk or file. → extract the shared shape, call it from both.
+- **Feature Envy** — a method reaching into another object's data more than its own. → move the method onto the data it envies.
+- **Data Clumps** — the same few fields or params keep travelling together. → bundle them into one type, pass that.
+- **Primitive Obsession** — a primitive or string standing in for a domain concept. → give the concept its own small type.
+- **Repeated Switches** — the same `switch`/`if`-cascade on the same type recurs. → replace with polymorphism, or one map both sites share.
+- **Shotgun Surgery** — one logical change forces scattered edits across many files. → gather what changes together into one module.
+- **Divergent Change** — one file edited for several unrelated reasons. → split so each module changes for one reason.
+- **Speculative Generality** — abstraction or hooks added for needs the ticket doesn't have. → delete it; inline back until a real need shows.
+- **Message Chains** — long `a.b().c().d()` navigation the caller shouldn't depend on. → hide the walk behind one method on the first object.
+- **Middle Man** — a class or function that mostly just delegates onward. → cut it, call the real target direct.
+- **Refused Bequest** — a subclass that ignores or overrides most of what it inherits. → drop the inheritance, use composition.
+
+The implementer runs `/code-review` (which carries this same baseline) before
+pushing, so clean work should mostly be clean here. Findings you still see are
+either ones they disagreed with — the PR body should say so — or ones they
+missed. Both are worth raising; neither is a reason to skip your own read.
 5. Verdict, one of:
    - **Approve** — `gh pr review <n> --approve --body "..."` summarising what
      you verified. On an armed PR this lands the change; approve only when

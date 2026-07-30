@@ -21,6 +21,9 @@ other.
 
 ### Generation: mattpocock-skills plugin (installed at user scope)
 
+These are all `disable-model-invocation: true` — you drive them by slash
+command; an agent never picks them up on its own.
+
 | Skill | Use |
 |---|---|
 | `/grill-me` | Interview until the design decisions are actually resolved |
@@ -28,9 +31,51 @@ other.
 | `/to-spec` | Work was already discussed — skip the interview, write up what was agreed |
 | `/to-tickets` | Break a spec/plan/conversation into thin vertical-slice issues, dependency-ordered |
 | `/triage` | Move issues through the label lifecycle |
-| `/wayfinder` | Large fuzzy initiatives — parent "map" issue, child tickets created only at the frontier |
+| `/wayfinder` | Charts a large fuzzy initiative as a map issue of **decision** tickets — see below |
+| `/improve-codebase-architecture` | Scan for shallow modules, get an HTML report of deepening candidates, grill through one |
 
 Small tasks skip all of this — go straight to execution.
+
+**`/wayfinder` is planning, not building.** Its tickets resolve *decisions* —
+they are not slices of a build. Each carries a `wayfinder:<type>` label
+(`research` / `prototype` / `grilling` / `task`) on a second axis from the
+triage roles, and most are HITL by construction: a `wayfinder:grilling` ticket
+only resolves through live exchange with a human. It sits **upstream** of
+`/to-spec` and `/to-tickets` and replaces neither — wayfinder until the way is
+clear, then spec, then tickets, then the loop.
+
+`ticket-loop.sh` therefore refuses `wayfinder:*` tickets outright: the auto-pick
+filters them, and an explicit `--issue` naming one is an error. An agent sent to
+"implement" a grilling ticket would answer its own question and open a PR for
+it.
+
+### Execution: the same plugin's model-invocable skills
+
+Everything above is human-driven. These carry no `disable-model-invocation`, so
+an agent inside the loop reaches them on its own — no wiring needed, and they
+are the menu that ticket labels select from (see *Workflows per ticket*).
+
+| Skill | Where it lands |
+|---|---|
+| `/tdd` | Red→green loop. **Needs its seams pre-agreed** — see below |
+| `/diagnosing-bugs` | Diagnosis loop; replaces `superpowers:systematic-debugging` |
+| `/code-review` | Two-axis (Standards + Spec) self-check the implement pass runs before pushing |
+| `/resolving-merge-conflicts` | When the default branch has moved under a PR |
+| `/research` | Background agent against primary sources |
+| `/prototype` | **HITL only** — the user runs it and reacts. Never on a `ready-for-agent` ticket |
+| `/codebase-design` | Deep-module vocabulary: module, interface, depth, seam, adapter, leverage, locality |
+| `/domain-modeling` | Owns the `CONTEXT.md` and `docs/adr/` formats this doc mandates |
+
+**Seams must arrive in the ticket.** `/tdd`'s core rule is that no test is
+written at an unconfirmed seam — "confirm them with the user". An unattended
+pass has no user to confirm with, so it either invents seams (defeating the
+discipline) or stalls. `/to-tickets` output for anything labelled `workflow:tdd`
+must therefore name the seams under test in the issue body. A ticket that
+doesn't is not ready for an agent.
+
+**`/implement` is deliberately not adopted.** It is the plugin's alternative
+*orchestrator* — `ticket-loop.sh` is ours — and being
+`disable-model-invocation: true` it is unreachable from the runner anyway.
 
 **Per-repo setup:** run `/setup-matt-pocock-skills` once in each repo before
 first use. It configures the issue tracker (GitHub), the triage label
@@ -154,14 +199,24 @@ as your only path there, or turn it off.
 
 ## Workflows per ticket
 
-1. **The menu** — default workflows live in the repo as named, versioned files
-   (e.g. `tdd-loop`, `spike`, `refactor`, `docs-only`). A ticket label selects
-   one.
+1. **The menu** — the model-invocable skills above *are* the menu. A
+   `workflow:<skill>` label on the ticket selects one, and the label name is
+   the skill name, so there are no menu files to write or keep current:
+
+   | Label | Runs |
+   |---|---|
+   | `workflow:tdd` | `/tdd` — must name its seams in the body |
+   | `workflow:diagnosing-bugs` | `/diagnosing-bugs` |
+   | `workflow:research` | `/research` |
+   | `workflow:prototype` | `/prototype` — HITL, pair with `ready-for-human` |
+
+   No label means the agent uses its judgement, as before.
 2. **Per-ticket overrides** — if no menu item fits, the ticket author writes a
    short **Workflow** section into the issue body: steps, gates, done-signal.
    Agents follow this if present, otherwise the labelled default.
 3. **Promotion rule** — the same bespoke workflow in three tickets gets
-   promoted to the menu via PR.
+   promoted: prefer an upstream skill where one fits, otherwise add a named
+   workflow to this table via PR.
 
 ## Repo documents vs tracker state
 
@@ -196,6 +251,15 @@ Piloting alongside Superpowers (still installed). Move projects one at a time:
 run `/setup-matt-pocock-skills` in the repo, create the labels, flip the value
 in its product YAML. Once the estate has moved, disable the superpowers plugin
 (`claude plugin disable superpowers`).
+
+**Remaining on `superpowers`:** `premier-league-survivor-picks` — the last one.
+Until it flips, the plugin stays installed, and that has a cost now that the
+execution-side skills are adopted: the `superpowers:using-superpowers`
+SessionStart hook tells every session (including the loop's unattended passes)
+that it MUST invoke a matching skill, and both plugins claim the same triggers.
+`superpowers:test-driven-development` and `:systematic-debugging` compete with
+`/tdd` and `/diagnosing-bugs` for the same work. Two skill sets, both live, is a
+transitional state to leave quickly — migrate that project, then disable.
 
 ## Canonical values
 

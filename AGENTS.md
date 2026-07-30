@@ -58,8 +58,8 @@ docs/                — presentations and design specs
 # (see choices/ai-dev-workflow.md for the full ticket-loop workflow)
 ./scripts/ticket-loop.sh --repo-dir <project-path> [--issue N] [--afk]
 
-# Onboard a repo to the separate-reviewer-identity flow (idempotent):
-# branch protection, auto-merge, human-signoff label, reviewer collaborator
+# Onboard a repo to the separate-reviewer-identity flow (idempotent): branch
+# protection, auto-merge, human-signoff + workflow:* labels, reviewer collaborator
 ./scripts/setup-reviewer.sh --repo-dir <project-path>
 ```
 
@@ -81,6 +81,11 @@ docs/                — presentations and design specs
 - The review pass runs as the reviewer machine account; its PAT lives in
   Doppler (`platform`/`prd`/`REVIEWER_GH_TOKEN`) — see "Reviewer identity &
   onboarding" in `choices/ai-dev-workflow.md`
+- Per-ticket workflows are selected by a `workflow:<skill>` label whose name is
+  the mattpocock skill name (`workflow:tdd` → `/tdd`) — no menu files exist by
+  design; the model-invocable skills are the menu
+- `wayfinder:*` issues are decision tickets and are refused by
+  `scripts/ticket-loop.sh` — filtered from the auto-pick, an error via `--issue`
 - Check output line format (`  <dim>: ✓|✗|✓* (details)`) is a parsed contract — changes require updating `parse_check_output` in checks/lib.sh and checks/tests/test-parse.sh
 - `data/conformity-snapshot.json` is the machine-readable contract between checks, create-issues.sh, and the planned estate dashboard
 

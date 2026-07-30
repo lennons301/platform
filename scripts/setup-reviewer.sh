@@ -11,7 +11,7 @@
 #      dismiss stale approvals on push — merged with any existing protection
 #      (required status checks and enforce_admins are preserved)
 #   2. enable the repo's allow-auto-merge setting
-#   3. create the human-signoff label
+#   3. create the human-signoff and workflow:* labels
 #   4. seed docs/agents/review-gates.yaml gate-extension stub (left for you
 #      to commit)
 #   5. invite the reviewer machine account as a write collaborator
@@ -91,12 +91,24 @@ fi
 gh api -X PATCH "repos/$NWO" -F allow_auto_merge=true > /dev/null
 echo "==> allow_auto_merge: enabled"
 
-# --- 3. Label -------------------------------------------------------------------
+# --- 3. Labels ------------------------------------------------------------------
 
 gh label create human-signoff --repo "$NWO" --force \
   --description "Gated: reviewer done, a human merges after looking" \
   --color 5319e7 > /dev/null
 echo "==> Label: human-signoff"
+
+# Workflow menu: the label name IS the skill name, so a ticket labelled
+# workflow:tdd selects /tdd with no menu file to maintain. See 'Workflows per
+# ticket' in choices/ai-dev-workflow.md.
+for wf in tdd:"Red-green loop — body MUST name the seams under test" \
+          diagnosing-bugs:"Diagnosis loop before any fix" \
+          research:"Background agent against primary sources" \
+          prototype:"Throwaway prototype — HITL, pair with ready-for-human"; do
+  gh label create "workflow:${wf%%:*}" --repo "$NWO" --force \
+    --description "${wf#*:}" --color 1d76db > /dev/null
+done
+echo "==> Labels: workflow:tdd, workflow:diagnosing-bugs, workflow:research, workflow:prototype"
 
 # --- 4. Gate-extension stub -----------------------------------------------------
 
