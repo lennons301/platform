@@ -6,11 +6,11 @@ status: active
 package_manager: pnpm
 
 choices:
-  ai_workflow: superpowers
+  ai_workflow: ticket-loop
   hosting: self-hosted-hetzner
   database: sqlite
   auth: none
-  secrets: env-file
+  secrets: doppler
   ui: shadcn-tailwind
   dev_environment: mise-just
   linting: biome
@@ -42,14 +42,6 @@ divergences:
     reason: >
       Development platform needs Docker daemon access and persistent containers.
       Serverless hosting is architecturally incompatible.
-  - standard: secrets
-    choice: doppler
-    reason: >
-      Migrated off the env-file divergence 2026-07-28 (Phase 4). Orchestrator
-      secrets live in Doppler project `interlude` (dev = local, prd = VPS); the
-      app boots via `doppler run`, with only a prd service token (DOPPLER_TOKEN)
-      on the VPS. Aligns with the platform standard and the Doppler already used
-      for agent-container secrets.
   - standard: linting
     choice: eslint
     reason: >
