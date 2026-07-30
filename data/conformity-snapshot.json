@@ -1,6 +1,6 @@
 {
-  "generated_at": "2026-07-25T07:50:31Z",
-  "platform_commit": "2bbff86",
+  "generated_at": "2026-07-30T07:23:28Z",
+  "platform_commit": "82b9de8",
   "total_gaps": 10,
   "total_products_checked": 4,
   "products": [
@@ -49,8 +49,8 @@
         },
         {
           "dimension": "secrets",
-          "status": "divergence",
-          "details": "intentional divergence"
+          "status": "pass",
+          "details": ""
         },
         {
           "dimension": "testing",
