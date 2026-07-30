@@ -102,14 +102,31 @@ fi
 
 # --- Pick a ticket -----------------------------------------------------------
 
+# Wayfinder tickets are decision tickets, not build slices — a wayfinder:grilling
+# ticket exists to be answered by a human, and an agent sent to "implement" one
+# would answer its own question and open a PR for it. They must never reach this
+# loop, however they got labelled ready-for-agent.
 if [ -z "$ISSUE" ]; then
   ISSUE="$(gh issue list --label ready-for-agent --state open \
-    --json number --jq 'sort_by(.number) | .[0].number // empty')"
+    --json number,labels \
+    --jq '[.[] | select([.labels[].name | startswith("wayfinder:")] | any | not)]
+          | sort_by(.number) | .[0].number // empty')"
   if [ -z "$ISSUE" ]; then
-    echo "No open ready-for-agent issues. Nothing to do."
+    echo "No open ready-for-agent issues (excluding wayfinder tickets). Nothing to do."
     exit 0
   fi
 fi
+
+# Explicit --issue bypasses the pick above, so guard it here too — loudly, since
+# naming a wayfinder ticket directly is a mistake rather than a quiet skip.
+if gh issue view "$ISSUE" --json labels \
+    --jq '[.labels[].name | startswith("wayfinder:")] | any' | grep -q true; then
+  echo "==> ERROR: issue #$ISSUE is a wayfinder ticket (wayfinder:* label)." >&2
+  echo "    Wayfinder tickets resolve decisions, not code — work it with /wayfinder." >&2
+  echo "    See 'Plan, don't do' in choices/ai-dev-workflow.md." >&2
+  exit 1
+fi
+
 echo "==> Issue #$ISSUE in $REPO_NAME"
 
 # --- Attempt accounting ------------------------------------------------------
@@ -173,9 +190,14 @@ Work GitHub issue #$ISSUE of this repo. This is attempt $ATTEMPT of $MAX_ATTEMPT
 3. Implement on the current branch ($BRANCH). Make small atomic commits.
 4. Validate: run the repo's tests and lint (just test / just lint if a
    justfile exists). Do not proceed with failing checks.
-5. Push the branch and open a PR titled after the issue, whose body starts
+5. Self-review before pushing: run the /code-review skill with fixed point
+   origin/$DEFAULT_BRANCH and issue #$ISSUE as the spec. Act on findings you
+   agree with; where you disagree, say so in the PR body rather than silently
+   ignoring them. This is rework-avoidance, not the gate — a separate
+   ticket-reviewer with fresh eyes is still the thing that approves.
+6. Push the branch and open a PR titled after the issue, whose body starts
    with 'Closes #$ISSUE'. If a PR for this branch already exists, push to it.
-6. If you are genuinely blocked (missing decision, contradictory spec),
+7. If you are genuinely blocked (missing decision, contradictory spec),
    comment your findings on issue #$ISSUE, label it ready-for-human, and stop.
 " "${IMPLEMENT_FLAGS[@]}")
 
