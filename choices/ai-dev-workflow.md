@@ -89,6 +89,38 @@ vocabulary, and where `CONTEXT.md`/ADRs live (writes `docs/agents/`).
 - `ready-for-agent` (AFK) — an agent can implement and merge unattended
 - `ready-for-human` (HITL) — needs a human decision or human implementation
 
+### Who may arm a ticket
+
+Applying `ready-for-agent` is the launch button: it authorises unattended code
+to land. The rule is about **provenance, not about who types the command**.
+
+**Arming requires an explicit human decision, expressed through any channel
+where the human is actually deciding.** All of these are the owner arming work,
+and all are legitimate:
+
+- the owner applying the label directly;
+- an interactive session applying it to tickets the owner has just approved —
+  a `/to-tickets` run, say, where the breakdown was reviewed before publishing;
+- an agent *asking* — a triage pass recommending a ticket in Discord, the owner
+  replying yes, the orchestrator applying the label on that confirmation.
+
+**No unattended pass may arm on its own judgement.** Triage, the autonomous
+executor, and anything else reading inbound issues may recommend, label
+`needs-info`, or label `ready-for-human` — never `ready-for-agent`. The reason
+is provenance: an issue body is untrusted text, so a pass that can both read one
+and arm it hands the launch button to whoever opened the issue.
+
+A confirmation is only a decision if the owner saw what they were agreeing to.
+Record the arming route on the issue, so "who armed this and on what basis" is
+answerable after the fact.
+
+Claim eligibility is a second, independent control: an issue whose author is not
+allow-listed is not claimable even when labelled, so the label alone was never
+the only thing between an outside contributor and a merge.
+
+Whether to arm a whole generated batch at once is a *pacing* decision, separate
+from all of the above, and belongs to the owner batch by batch.
+
 ### Execution: one agent per ticket, no orchestrator
 
 - Each ticket is worked by one agent (or human) in its own git worktree and
@@ -278,7 +310,9 @@ fuzzy initiative.
   Restrict who can create/label issues on any repo running unattended agents;
   outside contributors must not be able to reach `ready-for-agent`. With
   auto-merge live this is a hard requirement, not advice: whoever can label an
-  issue `ready-for-agent` can cause code to land unattended. The deterministic
+  issue `ready-for-agent` can cause code to land unattended. This is why an
+  unattended pass may never arm on its own judgement — see "Who may arm a
+  ticket". The deterministic
   gates (`standards/review-gates.yaml`) are the owner's mechanical control
   surface — a PR can never widen its own gates (the extension file is read
   from the default branch and is itself gated).
