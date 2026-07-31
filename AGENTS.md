@@ -46,6 +46,7 @@ docs/                — presentations and design specs
 ./checks/check-versions.sh <project-path> <product-yaml>
 ./checks/check-environments.sh <project-path> <product-yaml>
 ./checks/check-architecture.sh <project-path> <product-yaml>
+./checks/check-domain-modelling.sh <project-path> <product-yaml>
 
 # Sync global Claude Code instructions from this repo to ~/.claude/CLAUDE.md
 ./scripts/sync-claude-md.sh           # interactive (shows diff, prompts)
@@ -87,6 +88,8 @@ docs/                — presentations and design specs
 - `wayfinder:*` issues are decision tickets and are refused by
   `scripts/ticket-loop.sh` — filtered from the auto-pick, an error via `--issue`
 - Check output line format (`  <dim>: ✓|✗|✓* (details)`) is a parsed contract — changes require updating `parse_check_output` in checks/lib.sh and checks/tests/test-parse.sh
+- Adding a check means registering it in `checks/check-all.sh` **and** bumping the dimension count in `checks/tests/test-snapshot.sh`
+- `create-issues.sh` routes gaps by dimension: mechanical ones get `platform-upgrade`, ones needing a human decision get `ready-for-human` (see `issue_label`)
 - `data/conformity-snapshot.json` is the machine-readable contract between checks, create-issues.sh, and the planned estate dashboard
 
 ## Platform Context

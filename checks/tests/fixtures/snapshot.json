@@ -1,7 +1,7 @@
 {
   "generated_at": "2026-07-22T00:00:00Z",
   "platform_commit": "abc1234",
-  "total_gaps": 3,
+  "total_gaps": 4,
   "total_products_checked": 2,
   "products": [
     {
@@ -10,10 +10,11 @@
       "category": "product",
       "status": "active",
       "checked": true,
-      "gap_count": 2,
+      "gap_count": 3,
       "dimensions": [
         {"dimension": "secrets", "status": "fail", "details": "not yet migrated to Doppler"},
         {"dimension": "versions", "status": "fail", "details": "next: 15 → 16"},
+        {"dimension": "domain-modelling", "status": "fail", "details": "no CONTEXT.md — no domain model has been recorded"},
         {"dimension": "environments", "status": "divergence", "details": "intentional divergence"},
         {"dimension": "documentation", "status": "pass", "details": ""}
       ]
