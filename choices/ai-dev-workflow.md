@@ -290,7 +290,7 @@ fuzzy initiative.
 ## Migration status
 
 **Complete (2026-07-31).** Every active product is on ticket-loop and the
-superpowers plugin is disabled (`claude plugin disable superpowers`).
+superpowers plugin is uninstalled (`claude plugin uninstall superpowers`).
 
 The last holdout was `premier-league-survivor-picks`, which never migrated —
 it was archived instead (`status: archived`, superseded by
@@ -305,8 +305,9 @@ plugins claimed the same triggers, with
 `superpowers:test-driven-development` and `:systematic-debugging` competing
 against `/tdd` and `/diagnosing-bugs`. One skill set now owns each trigger.
 
-Disable is reversible and leaves the plugin cached; `claude plugin uninstall
-superpowers` removes it entirely if the disk matters.
+To reinstate it: `claude plugin install superpowers@claude-plugins-official`.
+Nothing in the estate depends on it — reinstating would be a new decision, not
+a rollback.
 
 ## Canonical values
 
