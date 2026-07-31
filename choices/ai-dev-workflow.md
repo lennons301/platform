@@ -173,6 +173,47 @@ a repo, or run `--afk` (which skips permissions entirely).
 repo. Approve and merge when satisfied; the reviewer's comment-review explains
 what it verified.
 
+## After /to-tickets: milestones, frontier, completion
+
+A generation run drops a batch of tickets into a repo that already has other
+issues. Three rules keep the batch legible afterwards — they apply to every
+generation run, not just the first.
+
+**1. The milestone is the phase; the spec issue is not part of it.** Group the
+generated tickets under one milestone named for the roadmap item. `0 open` on
+that milestone is the completion signal, and it only means something if
+everything in it is *work*. So once `/to-tickets` has decomposed a spec issue,
+close the spec issue with a comment linking the tickets it produced. (`/to-tickets`
+deliberately never touches a parent issue — it can't tell a one-off spec from a
+long-lived `/wayfinder` map, so the close is the human's call.) Leaving it open
+inside the milestone parks the count at n+1 forever and makes the spec show up
+as startable work. Keeping it open as an anchor is fine for a fuzzy initiative —
+then drop it *out* of the milestone.
+
+**2. Dependency order is data, not memory.** `/to-tickets` records blocking
+edges as native GitHub issue dependencies. GitHub counts only *open* blockers,
+so a ticket is on the frontier exactly when `blocked_by` is 0, and it becomes
+eligible on its own as its blockers close. Nothing needs re-sequencing by hand.
+
+**3. Arm from the frontier.** The frontier query — open, in the milestone, no
+open blockers:
+
+```bash
+for n in $(gh issue list --milestone "<milestone>" --state open \
+             --limit 100 --json number --jq '.[].number' | sort -n); do
+  gh api "repos/{owner}/{repo}/issues/$n" \
+    --jq 'select((.issue_dependencies_summary.blocked_by // 0) == 0)
+          | "#\(.number)  \(.title)"'
+done
+```
+
+`ticket-loop.sh` skips blocked tickets in its auto-pick and refuses a blocked
+`--issue` outright, so the order survives an armed ticket that isn't ready.
+Interlude's autonomous executor applies the same rule as a claim-eligibility
+check (Phase 5). Publishing a generated batch **unlabelled** and arming from
+the frontier keeps `ready-for-agent` doing one honest job: it is both the
+launch button and the sequencer.
+
 ### Human parity (solo developer)
 
 This estate has one developer. The reviewer identity exists to **enable
