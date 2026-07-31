@@ -6,6 +6,9 @@ status: archived
 package_manager: npm
 
 choices:
+  # Retired value, kept as a record of what this project used. It was archived
+  # rather than migrated, and the superpowers plugin is now disabled
+  # estate-wide. Archived products are skipped by checks/check-all.sh.
   ai_workflow: superpowers
   hosting: vercel-hobby
   database: supabase

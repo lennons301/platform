@@ -16,7 +16,7 @@ to understand its current choices and any intentional divergences.
 
 ## Development Workflow
 
-- The default AI dev workflow is **ticket-loop**: work items are generated
+- The AI dev workflow is **ticket-loop**, estate-wide: work items are generated
   with the mattpocock-skills plugin (`/grill-me`, `/to-spec`, `/to-tickets`)
   and published as GitHub issues; execution is one agent per ticket in its
   own worktree, reviewed by the separate `ticket-reviewer` agent. See
@@ -24,9 +24,12 @@ to understand its current choices and any intentional divergences.
   and the `scripts/ticket-loop.sh` runner.
 - A generated ticket is the spec — don't run a second planning ceremony on
   top of it.
-- Projects still on the legacy Superpowers flow have
-  `choices.ai_workflow: superpowers` in their product YAML; follow that
-  flow there until they migrate.
+- Per-ticket workflows are selected by a `workflow:<skill>` label whose name is
+  the skill's own name — `workflow:tdd` runs `/tdd`. No label means use your
+  judgement.
+- The legacy Superpowers flow is **retired** (2026-07-31) and its plugin is
+  disabled. `choices.ai_workflow: superpowers` survives only on archived
+  products as a record of what they used.
 
 ## Documentation Maintenance
 

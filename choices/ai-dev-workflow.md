@@ -1,6 +1,7 @@
 # AI Dev Workflow Choice
 
-**Current default:** ticket-loop (piloting; superpowers remains the legacy value)
+**Current choice:** ticket-loop — the only one. Superpowers was retired on
+2026-07-31.
 
 ## Decision
 
@@ -288,22 +289,31 @@ fuzzy initiative.
 
 ## Migration status
 
-Piloting alongside Superpowers (still installed). Move projects one at a time:
-run `/setup-matt-pocock-skills` in the repo, create the labels, flip the value
-in its product YAML. Once the estate has moved, disable the superpowers plugin
-(`claude plugin disable superpowers`).
+**Complete (2026-07-31).** Every active product is on ticket-loop and the
+superpowers plugin is disabled (`claude plugin disable superpowers`).
 
-**Remaining on `superpowers`:** `premier-league-survivor-picks` — the last one.
-Until it flips, the plugin stays installed, and that has a cost now that the
-execution-side skills are adopted: the `superpowers:using-superpowers`
-SessionStart hook tells every session (including the loop's unattended passes)
-that it MUST invoke a matching skill, and both plugins claim the same triggers.
-`superpowers:test-driven-development` and `:systematic-debugging` compete with
-`/tdd` and `/diagnosing-bugs` for the same work. Two skill sets, both live, is a
-transitional state to leave quickly — migrate that project, then disable.
+The last holdout was `premier-league-survivor-picks`, which never migrated —
+it was archived instead (`status: archived`, superseded by
+`last-person-standing`), so its `ai_workflow: superpowers` is a historical
+record of what it used, not a live dependency. Archived products are skipped by
+`checks/check-all.sh`, so nothing checks it.
+
+Retiring the plugin mattered more once the execution-side skills were adopted:
+`superpowers:using-superpowers` injects a "you MUST invoke a matching skill"
+instruction at session start — including the loop's unattended passes — and both
+plugins claimed the same triggers, with
+`superpowers:test-driven-development` and `:systematic-debugging` competing
+against `/tdd` and `/diagnosing-bugs`. One skill set now owns each trigger.
+
+Disable is reversible and leaves the plugin cached; `claude plugin uninstall
+superpowers` removes it entirely if the disk matters.
 
 ## Canonical values
 
 For use in `products/*.yaml` under `choices.ai_workflow`:
-- `ticket-loop` — Pocock skills for generation + independent per-ticket loops (default)
-- `superpowers` — legacy two-document flow (design doc + implementation plan)
+- `ticket-loop` — Pocock skills for generation + independent per-ticket loops.
+  The only valid value for an active product.
+- `superpowers` — **retired.** The legacy two-document flow (design doc +
+  implementation plan). The plugin is disabled estate-wide, so this value no
+  longer describes a runnable workflow. It survives only on archived products
+  as a record of what they used; do not set it on anything new.

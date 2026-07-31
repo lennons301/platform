@@ -73,8 +73,9 @@ docs/                — presentations and design specs
 - Version targets are floors, not pins (actual >= target is conformant)
 - Templates use `{{PLACEHOLDER}}` syntax for project-specific values
 - Agent context lives in `AGENTS.md` (agent-agnostic); `CLAUDE.md` references it via `@AGENTS.md`
-- The estate's AI dev workflow is a per-product choice (`choices.ai_workflow`):
-  `ticket-loop` (default — see `choices/ai-dev-workflow.md`) or `superpowers` (legacy)
+- The estate's AI dev workflow is `ticket-loop` everywhere (`choices.ai_workflow`
+  — see `choices/ai-dev-workflow.md`); `superpowers` is retired and its plugin
+  disabled, surviving only on archived products as a historical record
 - Ticket-loop PRs auto-merge on reviewer approval unless a deterministic review
   gate matches (`standards/review-gates.yaml` + per-repo
   `docs/agents/review-gates.yaml`, evaluated by `scripts/review-gates-lib.sh`);
