@@ -106,13 +106,30 @@ fi
 # ticket exists to be answered by a human, and an agent sent to "implement" one
 # would answer its own question and open a PR for it. They must never reach this
 # loop, however they got labelled ready-for-agent.
+# Blocked tickets are skipped too. /to-tickets records dependency order as
+# native GitHub issue dependencies, and GitHub counts only OPEN blockers — so a
+# ticket is on the frontier exactly when blocked_by is 0, and it becomes
+# eligible on its own as blockers close. Without this check the loop would take
+# the oldest armed ticket and build a slice whose foundation does not exist yet.
+is_blocked() {
+  [ "$(gh api "repos/{owner}/{repo}/issues/$1" \
+        --jq '.issue_dependencies_summary.blocked_by // 0' 2>/dev/null || echo 0)" != "0" ]
+}
+
 if [ -z "$ISSUE" ]; then
-  ISSUE="$(gh issue list --label ready-for-agent --state open \
+  CANDIDATES="$(gh issue list --label ready-for-agent --state open \
     --json number,labels \
     --jq '[.[] | select([.labels[].name | startswith("wayfinder:")] | any | not)]
-          | sort_by(.number) | .[0].number // empty')"
+          | sort_by(.number) | .[].number')"
+  for c in $CANDIDATES; do
+    if is_blocked "$c"; then
+      echo "==> Skipping #$c — blocked by an open dependency."
+      continue
+    fi
+    ISSUE="$c"; break
+  done
   if [ -z "$ISSUE" ]; then
-    echo "No open ready-for-agent issues (excluding wayfinder tickets). Nothing to do."
+    echo "No open ready-for-agent issues on the frontier (excluding wayfinder and blocked tickets). Nothing to do."
     exit 0
   fi
 fi
@@ -124,6 +141,16 @@ if gh issue view "$ISSUE" --json labels \
   echo "==> ERROR: issue #$ISSUE is a wayfinder ticket (wayfinder:* label)." >&2
   echo "    Wayfinder tickets resolve decisions, not code — work it with /wayfinder." >&2
   echo "    See 'Plan, don't do' in choices/ai-dev-workflow.md." >&2
+  exit 1
+fi
+
+# Same for blockers: a quiet skip is right for the auto-pick, but naming a
+# blocked ticket directly is a mistake worth stopping on.
+if is_blocked "$ISSUE"; then
+  echo "==> ERROR: issue #$ISSUE is blocked by an open dependency." >&2
+  gh api "repos/{owner}/{repo}/issues/$ISSUE/dependencies/blocked_by" \
+    --jq '.[] | select(.state == "open") | "    blocked by #\(.number) — \(.title)"' >&2 2>/dev/null || true
+  echo "    Work its blockers first, or clear the edge if it is wrong." >&2
   exit 1
 fi
 
