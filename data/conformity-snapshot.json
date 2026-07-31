@@ -1,7 +1,7 @@
 {
-  "generated_at": "2026-07-30T07:23:28Z",
-  "platform_commit": "82b9de8",
-  "total_gaps": 10,
+  "generated_at": "2026-07-31T08:46:12Z",
+  "platform_commit": "2c868ac",
+  "total_gaps": 14,
   "total_products_checked": 4,
   "products": [
     {
@@ -10,7 +10,7 @@
       "category": "infrastructure",
       "status": "active",
       "checked": true,
-      "gap_count": 4,
+      "gap_count": 5,
       "dimensions": [
         {
           "dimension": "architecture",
@@ -31,6 +31,11 @@
           "dimension": "documentation",
           "status": "fail",
           "details": "no AGENTS.md — see standards/agent-context.md"
+        },
+        {
+          "dimension": "domain-modelling",
+          "status": "fail",
+          "details": "no CONTEXT.md — no domain model has been recorded"
         },
         {
           "dimension": "environments",
@@ -70,7 +75,7 @@
       "category": "product",
       "status": "active",
       "checked": true,
-      "gap_count": 1,
+      "gap_count": 2,
       "dimensions": [
         {
           "dimension": "architecture",
@@ -91,6 +96,11 @@
           "dimension": "documentation",
           "status": "pass",
           "details": ""
+        },
+        {
+          "dimension": "domain-modelling",
+          "status": "fail",
+          "details": "no CONTEXT.md — no domain model has been recorded"
         },
         {
           "dimension": "environments",
@@ -130,7 +140,7 @@
       "category": "product",
       "status": "active",
       "checked": true,
-      "gap_count": 5,
+      "gap_count": 6,
       "dimensions": [
         {
           "dimension": "architecture",
@@ -151,6 +161,11 @@
           "dimension": "documentation",
           "status": "pass",
           "details": ""
+        },
+        {
+          "dimension": "domain-modelling",
+          "status": "fail",
+          "details": "no CONTEXT.md — no domain model has been recorded"
         },
         {
           "dimension": "environments",
@@ -190,7 +205,7 @@
       "category": "product",
       "status": "active",
       "checked": true,
-      "gap_count": 0,
+      "gap_count": 1,
       "dimensions": [
         {
           "dimension": "architecture",
@@ -211,6 +226,11 @@
           "dimension": "documentation",
           "status": "pass",
           "details": ""
+        },
+        {
+          "dimension": "domain-modelling",
+          "status": "fail",
+          "details": "no CONTEXT.md — no domain model has been recorded"
         },
         {
           "dimension": "environments",
