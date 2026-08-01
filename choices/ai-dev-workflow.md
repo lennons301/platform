@@ -148,6 +148,40 @@ from all of the above, and belongs to the owner batch by batch.
   the review gates, then runs the review pass with fresh context under the
   reviewer identity.
 
+## Capability contracts
+
+A failure class found live on interlude#29 / platform#12: **a pass prompt
+promising capabilities the executor doesn't actually provide**. The laptop
+runner's implement pass instructed `gh issue view`, `git commit`,
+`gh pr create` — but pre-approved only `git push` and `doppler run`, so on a
+repo whose allowlist hadn't grown those verbs the headless pass was
+auto-denied everything it was told to do, *including its own escape hatch*
+(comment + relabel `ready-for-human`). Permission rules are only one way to
+hit the class: a container with no authenticated `gh`, or a
+`workflow:<skill>` label naming a skill the executor doesn't have, fails the
+same way.
+
+The rule: **every executor states an explicit capability contract for its
+passes — what the agent can run, what auth it has, which skills resolve —
+and its pass prompts are derived from that contract**, so prompt and
+capabilities cannot drift.
+
+Instances:
+
+- **The laptop runner** (`scripts/ticket-loop.sh`): the contract is the
+  `IMPLEMENT_VERBS` / `REVIEW_VERBS` arrays. Each pass's `--allowedTools` is
+  rendered from its array, and the permission preflight checks ask/deny rules
+  against the same arrays — one definition, three consumers. Changing a pass
+  prompt (or `templates/agents/ticket-reviewer.md`, which the review pass
+  launches) means updating the matching array in the same change.
+- **Interlude's Phase 5 native executor** provides capabilities
+  architecturally (`--dangerously-skip-permissions` inside isolated
+  containers, GitHub side-effects moved to the orchestrator, git via
+  credential helper), so it cannot hit the permission variant — but its
+  implement prompt must not instruct `gh` verbs the container cannot
+  authenticate, and `workflow:<skill>` labels must resolve to skills the
+  container actually has (interlude#15, interlude#28).
+
 ## Reviewer identity & onboarding
 
 The review pass runs as a dedicated GitHub **machine account** so its
@@ -192,15 +226,29 @@ dismissed on push — existing rules preserved), enables auto-merge, creates the
 `human-signoff` label, seeds `docs/agents/review-gates.yaml` (commit it), and
 invites + accepts the reviewer as a write collaborator.
 
-**Repo permission rules:** the implement pass pre-approves `git push` and
-`doppler run` via `--allowedTools`, but Claude Code evaluates permission rules
-deny → ask → allow with the *first match winning* — an `ask`/`deny` rule in
-the repo's `.claude/settings.json` or `.claude/settings.local.json` (worktree
-sessions resolve these to the main checkout) beats any allow from any source,
-and a non-interactive pass cannot answer an ask prompt, so the push dies
-mid-run. `ticket-loop.sh` preflights these files (plus `~/.claude/settings.json`)
-and fails fast naming the offending rule; remove or relax it before onboarding
-a repo, or run `--afk` (which skips permissions entirely).
+**Repo permission rules:** each headless pass pre-approves, via
+`--allowedTools`, exactly the command verbs its prompt (or the agent
+definition it launches) instructs — the implement pass's workflow verbs
+(issue read/comment/relabel, stage/commit, push, PR create/update,
+`doppler run`) and the review pass's reviewer verbs (issue/PR read, CI
+checks, review submission, auto-merge disarm, labelling). Onboarding
+therefore does not depend on a repo's interactively-grown allowlist: on a
+repo with no allow rules at all, both passes function. Repo-specific check
+commands (tests, lint) are the deliberate exception — they run under the
+already-approved `doppler run`, or fall to the repo's own allowlist.
+
+What a repo's settings *can* still do is block: Claude Code evaluates
+permission rules deny → ask → allow with the *first match winning* — an
+`ask`/`deny` rule in the repo's `.claude/settings.json` or
+`.claude/settings.local.json` (worktree sessions resolve these to the main
+checkout) beats any allow from any source, and a non-interactive pass cannot
+answer an ask prompt, so the pass dies mid-run. `ticket-loop.sh` preflights
+these files (plus `~/.claude/settings.json`) against the full carried verb
+set of both passes and fails fast naming the offending rule; remove or relax
+it before onboarding a repo. (`--afk` skips permissions for the implement
+pass only — the review pass always runs under permissions.) The carried sets
+and the preflight's checked set are one definition in the runner — see
+*Capability contracts* above.
 
 **Finding gated PRs:** `gh pr list --label human-signoff --state open` in any
 repo. Approve and merge when satisfied; the reviewer's comment-review explains

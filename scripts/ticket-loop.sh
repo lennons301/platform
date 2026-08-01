@@ -63,41 +63,101 @@ git rev-parse --git-dir > /dev/null || { echo "Not a git repo: $REPO_DIR" >&2; e
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 REPO_NAME="$(basename "$REPO_ROOT")"
 
+# --- Capability contract -------------------------------------------------------
+# Each headless pass pre-approves, via --allowedTools, exactly the command
+# verbs its prompt (or the agent definition it launches) instructs — prompt
+# and permissions ship together, so they cannot drift (issue #12: a repo whose
+# allowlist lacked git commit / gh silently crippled the implement pass,
+# including its own escape hatch). These arrays also feed the permission
+# preflight below, so the carried sets and the checked set cannot drift
+# either. Repo-specific check commands (tests, lint) are deliberately NOT
+# part of the contract: they run under the already-approved `doppler run`,
+# or fall to the repo's own allowlist.
+
+# Implement pass (prompt below): read the issue, stage + commit, push, open
+# or update the PR, run checks under doppler-injected env, and the escape
+# hatch when blocked (comment on the issue + relabel ready-for-human).
+IMPLEMENT_VERBS=(
+  "gh issue view"
+  "gh issue comment"
+  "gh issue edit"
+  "git add"
+  "git commit"
+  "git push"
+  "gh pr list"
+  "gh pr view"
+  "gh pr create"
+  "gh pr edit"
+  "doppler run"
+)
+
+# Review pass: the ticket-reviewer agent's contract (canonical at
+# templates/agents/ticket-reviewer.md): read the ticket and PR (view, diff,
+# CI checks), submit the verdict (approve / request-changes / comment),
+# the human-signoff path (disarm auto-merge + label), and the escalation
+# path (PR comment + relabel the issue). `gh pr merge` is carried only with
+# --disable-auto — the reviewer may add a human gate, never merge.
+REVIEW_VERBS=(
+  "gh issue view"
+  "gh issue edit"
+  "gh pr view"
+  "gh pr diff"
+  "gh pr checks"
+  "gh pr review"
+  "gh pr comment"
+  "gh pr edit"
+  "gh pr merge --disable-auto"
+  "doppler run"
+)
+
+# "git push" "doppler run" -> "Bash(git push:*),Bash(doppler run:*)"
+allowed_tools() {
+  local CSV="" VERB
+  for VERB in "$@"; do CSV+="${CSV:+,}Bash(${VERB}:*)"; done
+  printf '%s' "$CSV"
+}
+
 # --- Permission preflight ------------------------------------------------------
-# The implement pass pre-approves git push / doppler run via --allowedTools,
-# but permission rules evaluate deny -> ask -> allow with the FIRST match
-# winning: an ask/deny rule covering those commands beats any allow from any
-# source, and a non-interactive pass cannot answer an ask prompt, so the push
+# The passes pre-approve their carried verbs via --allowedTools, but
+# permission rules evaluate deny -> ask -> allow with the FIRST match
+# winning: an ask/deny rule covering a carried verb beats any allow from any
+# source, and a non-interactive pass cannot answer an ask prompt, so the pass
 # dies mid-run (worktree sessions resolve .claude/settings*.json to this
-# checkout). Fail fast naming the offending rule instead.
-if [ -z "$AFK" ]; then  # --afk skips permissions entirely, nothing can block it
-  command -v jq > /dev/null || { echo "ERROR: jq is required." >&2; exit 1; }
-  BLOCKING=""
-  for SETTINGS in "$HOME/.claude/settings.json" \
-                  "$REPO_ROOT/.claude/settings.json" \
-                  "$REPO_ROOT/.claude/settings.local.json"; do
-    [ -f "$SETTINGS" ] || continue
-    while IFS= read -r RULE; do
-      PREFIX="${RULE#Bash(}"; PREFIX="${PREFIX%)}"; PREFIX="${PREFIX%":*"}"
-      if [ "$RULE" = "Bash" ] || [ "$PREFIX" = "*" ]; then
-        BLOCKING+="$SETTINGS: $RULE"$'\n'
-        continue
-      fi
-      for NEED in "git push" "doppler run"; do
-        case "$NEED" in "$PREFIX"*) BLOCKING+="$SETTINGS: $RULE"$'\n'; continue 2 ;; esac
-        case "$PREFIX" in "$NEED"*) BLOCKING+="$SETTINGS: $RULE"$'\n'; continue 2 ;; esac
-      done
-    done < <(jq -r '((.permissions.ask // []) + (.permissions.deny // []))[]
-                    | select(. == "Bash" or startswith("Bash("))' "$SETTINGS" 2>/dev/null)
-  done
-  if [ -n "$BLOCKING" ]; then
-    echo "==> ERROR: ask/deny permission rules would block the implement pass's git push / doppler run:" >&2
-    printf '%s' "$BLOCKING" | sed 's/^/    /' >&2
-    echo "    These beat --allowedTools (deny -> ask -> allow, first match wins), and a" >&2
-    echo "    non-interactive pass cannot answer an ask prompt. Remove or relax the rule(s)," >&2
-    echo "    or run with --afk. See 'Per-repo onboarding' in choices/ai-dev-workflow.md." >&2
-    exit 1
-  fi
+# checkout). Fail fast naming the offending rule instead. --afk skips
+# permissions for the implement pass only — the review pass always runs under
+# permissions, so its verbs are checked regardless.
+command -v jq > /dev/null || { echo "ERROR: jq is required." >&2; exit 1; }
+if [ -n "$AFK" ]; then
+  PREFLIGHT_VERBS=("${REVIEW_VERBS[@]}")
+else
+  PREFLIGHT_VERBS=("${IMPLEMENT_VERBS[@]}" "${REVIEW_VERBS[@]}")
+fi
+BLOCKING=""
+for SETTINGS in "$HOME/.claude/settings.json" \
+                "$REPO_ROOT/.claude/settings.json" \
+                "$REPO_ROOT/.claude/settings.local.json"; do
+  [ -f "$SETTINGS" ] || continue
+  while IFS= read -r RULE; do
+    PREFIX="${RULE#Bash(}"; PREFIX="${PREFIX%)}"; PREFIX="${PREFIX%":*"}"
+    if [ "$RULE" = "Bash" ] || [ "$PREFIX" = "*" ]; then
+      BLOCKING+="$SETTINGS: $RULE"$'\n'
+      continue
+    fi
+    for NEED in "${PREFLIGHT_VERBS[@]}"; do
+      case "$NEED" in "$PREFIX"*) BLOCKING+="$SETTINGS: $RULE"$'\n'; continue 2 ;; esac
+      case "$PREFIX" in "$NEED"*) BLOCKING+="$SETTINGS: $RULE"$'\n'; continue 2 ;; esac
+    done
+  done < <(jq -r '((.permissions.ask // []) + (.permissions.deny // []))[]
+                  | select(. == "Bash" or startswith("Bash("))' "$SETTINGS" 2>/dev/null)
+done
+if [ -n "$BLOCKING" ]; then
+  echo "==> ERROR: ask/deny permission rules would block commands the ticket-loop passes carry:" >&2
+  printf '%s' "$BLOCKING" | sed 's/^/    /' >&2
+  echo "    These beat --allowedTools (deny -> ask -> allow, first match wins), and a" >&2
+  echo "    non-interactive pass cannot answer an ask prompt. Remove or relax the rule(s)." >&2
+  echo "    (--afk skips permissions for the implement pass only; the review pass always" >&2
+  echo "    runs under permissions.) See 'Repo permission rules' in choices/ai-dev-workflow.md." >&2
+  exit 1
 fi
 
 # --- Pick a ticket -----------------------------------------------------------
@@ -196,11 +256,10 @@ echo "==> Worktree: $WORKTREE"
 # Fresh claude process, fresh context. The ticket is the spec.
 
 # Non-interactive sessions can't answer permission prompts, so pre-approve
-# what the loop's contract requires: pushing the branch and running the
-# repo's checks under doppler-injected env. (Prompting on git push while gh
-# api writes are allowed was cosmetic anyway — same capability.)
+# the pass's capability contract (IMPLEMENT_VERBS above) — everything the
+# prompt below instructs the agent to run.
 IMPLEMENT_FLAGS=(--permission-mode acceptEdits
-  --allowedTools "Bash(git push:*),Bash(doppler run:*)")
+  --allowedTools "$(allowed_tools "${IMPLEMENT_VERBS[@]}")")
 [ -n "$AFK" ] && IMPLEMENT_FLAGS=(--dangerously-skip-permissions)
 
 # NB: prompt must come BEFORE the flags — --allowedTools is variadic and
@@ -216,7 +275,8 @@ Work GitHub issue #$ISSUE of this repo. This is attempt $ATTEMPT of $MAX_ATTEMPT
    before writing code.
 3. Implement on the current branch ($BRANCH). Make small atomic commits.
 4. Validate: run the repo's tests and lint (just test / just lint if a
-   justfile exists). Do not proceed with failing checks.
+   justfile exists; wrap in 'doppler run --' if the checks need the repo's
+   env — that wrapper is pre-approved). Do not proceed with failing checks.
 5. Self-review before pushing: run the /code-review skill with fixed point
    origin/$DEFAULT_BRANCH and issue #$ISSUE as the spec. Act on findings you
    agree with; where you disagree, say so in the PR body rather than silently
@@ -318,11 +378,13 @@ if [ "$REVIEWER_ACTUAL" = "$IMPLEMENTER" ]; then
 fi
 
 echo "==> Reviewing PR #$PR as $REVIEWER_ACTUAL"
+# Pre-approve the reviewer's capability contract (REVIEW_VERBS above). Same
+# NB as the implement pass: the prompt must come BEFORE --allowedTools.
 (cd "$WORKTREE" && GH_TOKEN="$REVIEWER_TOKEN" claude -p "
 Launch the ticket-reviewer agent to review PR #$PR (originating issue #$ISSUE),
 then relay its verdict verbatim.
 
 Context for the reviewer: $GATE_NOTE
-")
+" --allowedTools "$(allowed_tools "${REVIEW_VERBS[@]}")")
 
 echo "==> Done. Issue #$ISSUE, PR #$PR, attempt $ATTEMPT."
