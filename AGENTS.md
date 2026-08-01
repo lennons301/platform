@@ -83,6 +83,12 @@ docs/                — presentations and design specs
 - The review pass runs as the reviewer machine account; its PAT lives in
   Doppler (`platform`/`prd`/`REVIEWER_GH_TOKEN`) — see "Reviewer identity &
   onboarding" in `choices/ai-dev-workflow.md`
+- Each headless ticket-loop pass pre-approves exactly the command verbs its
+  prompt (or the ticket-reviewer agent definition) instructs, rendered from
+  the `IMPLEMENT_VERBS`/`REVIEW_VERBS` arrays in `scripts/ticket-loop.sh`
+  that also feed the permission preflight — changing a pass prompt or
+  `templates/agents/ticket-reviewer.md` means updating the matching array
+  (see "Capability contracts" in `choices/ai-dev-workflow.md`)
 - Per-ticket workflows are selected by a `workflow:<skill>` label whose name is
   the mattpocock skill name (`workflow:tdd` → `/tdd`) — no menu files exist by
   design; the model-invocable skills are the menu
