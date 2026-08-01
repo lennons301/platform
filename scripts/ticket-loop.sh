@@ -275,7 +275,8 @@ Work GitHub issue #$ISSUE of this repo. This is attempt $ATTEMPT of $MAX_ATTEMPT
    before writing code.
 3. Implement on the current branch ($BRANCH). Make small atomic commits.
 4. Validate: run the repo's tests and lint (just test / just lint if a
-   justfile exists). Do not proceed with failing checks.
+   justfile exists; wrap in 'doppler run --' if the checks need the repo's
+   env — that wrapper is pre-approved). Do not proceed with failing checks.
 5. Self-review before pushing: run the /code-review skill with fixed point
    origin/$DEFAULT_BRANCH and issue #$ISSUE as the spec. Act on findings you
    agree with; where you disagree, say so in the PR body rather than silently
