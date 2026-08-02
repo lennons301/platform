@@ -148,6 +148,55 @@ from all of the above, and belongs to the owner batch by batch.
   the review gates, then runs the review pass with fresh context under the
   reviewer identity.
 
+### PR-state dispatch & the repair pass
+
+Parked PRs go stale underneath the loop: gated (`human-signoff`) PRs wait for
+a human merge, and each human merge can flip the still-parked ones to
+`CONFLICTING` — and the eventual fix-push dismisses the reviewer's approval
+(stale-approval dismissal is deliberate), leaving a review rerun nothing
+triggers. **Repair is a normal loop operation, not ad-hoc human work**:
+re-invoking the runner against an issue that already has an open PR reads the
+PR's state first and does only the work that state calls for, instead of
+burning one of the limited implement attempts regardless.
+
+After ticket selection, if an open PR exists for the issue branch
+(`agent/issue-N`), the runner polls `gh pr view --json
+mergeable,reviewDecision` — retrying while `mergeable` is `UNKNOWN`, which
+means "GitHub hasn't computed it yet" and is never treated as a verdict either
+way — then dispatches:
+
+| `mergeable` | `reviewDecision` | Runner does |
+|---|---|---|
+| `CONFLICTING` | any | **Repair pass**, then gates + review. No attempt consumed. |
+| `MERGEABLE` | `APPROVED` | Report parked awaiting human merge; exit 0. No agent invoked, no attempt consumed. |
+| `MERGEABLE` | none / `REVIEW_REQUIRED` | Gates + review only — covers an approval dismissed by a manual push, or a runner that died between passes. |
+| `MERGEABLE` | `CHANGES_REQUESTED` | Normal implement attempt (the work is addressing the feedback) — unchanged. |
+| *no open PR* | — | Normal implement attempt — unchanged. |
+
+**The repair pass** is a fresh headless session in the issue worktree that
+fetches origin, merges the default branch into the issue branch (**merge only
+— never rebase, never force-push**), resolves the conflicts
+(`/resolving-merge-conflicts` is the blessed skill), re-runs the repo's
+checks, and pushes. On success the invocation falls through to the existing
+gates → review sections unchanged: a resolution that newly touches a gated
+path re-gates the PR, and the approval the fix-push dismissed gets its review
+rerun automatically.
+
+Repair accounting: a repair posts its own `🔧` issue-comment marker —
+deliberately distinct from the `🤖 Attempt N/M` markers, so attempt counting
+is unaffected — and never increments the attempt count. If the PR is still
+`CONFLICTING` after the repair pass, the runner comments its findings on the
+issue, labels it `ready-for-human`, and exits non-zero. Fail fast — no retry
+loop.
+
+The implement pass carries the same duty as an exit criterion: before
+finishing, it must confirm the PR is `MERGEABLE`, integrating the current
+default branch (`git fetch` + `git merge`) and resolving if not. The runner
+remains the deterministic guarantor — after the implement pass it polls
+mergeability and routes `CONFLICTING` into the same repair machinery before
+gates/review. Repair keeps parked PRs mergeable; it never merges them —
+`human-signoff` still means a human merges.
+
 ## Capability contracts
 
 A failure class found live on interlude#29 / platform#12: **a pass prompt
@@ -169,11 +218,14 @@ capabilities cannot drift.
 Instances:
 
 - **The laptop runner** (`scripts/ticket-loop.sh`): the contract is the
-  `IMPLEMENT_VERBS` / `REVIEW_VERBS` arrays. Each pass's `--allowedTools` is
-  rendered from its array, and the permission preflight checks ask/deny rules
-  against the same arrays — one definition, three consumers. Changing a pass
-  prompt (or `templates/agents/ticket-reviewer.md`, which the review pass
-  launches) means updating the matching array in the same change.
+  `IMPLEMENT_VERBS` / `REPAIR_VERBS` / `REVIEW_VERBS` arrays. Each pass's
+  `--allowedTools` is rendered from its array, and the permission preflight
+  checks ask/deny rules against the same arrays — one definition, three
+  consumers. Changing a pass prompt (or `templates/agents/ticket-reviewer.md`,
+  which the review pass launches) means updating the matching array in the
+  same change. `REPAIR_VERBS` is the implement set minus the PR-creation
+  verbs (`gh pr list` / `create` / `edit`), plus `git fetch` / `git merge` —
+  no rebase or force-push verb appears in any headless contract.
 - **Interlude's Phase 5 native executor** provides capabilities
   architecturally (`--dangerously-skip-permissions` inside isolated
   containers, GitHub side-effects moved to the orchestrator, git via
@@ -229,8 +281,10 @@ invites + accepts the reviewer as a write collaborator.
 **Repo permission rules:** each headless pass pre-approves, via
 `--allowedTools`, exactly the command verbs its prompt (or the agent
 definition it launches) instructs — the implement pass's workflow verbs
-(issue read/comment/relabel, stage/commit, push, PR create/update,
-`doppler run`) and the review pass's reviewer verbs (issue/PR read, CI
+(issue read/comment/relabel, stage/commit, push, fetch/merge the default
+branch, PR create/update, `doppler run`), the repair pass's conflict-repair
+verbs (the implement set minus PR creation, plus `git fetch` / `git merge`),
+and the review pass's reviewer verbs (issue/PR read, CI
 checks, review submission, auto-merge disarm, labelling). Onboarding
 therefore does not depend on a repo's interactively-grown allowlist: on a
 repo with no allow rules at all, both passes function. Repo-specific check
@@ -244,9 +298,9 @@ permission rules deny → ask → allow with the *first match winning* — an
 checkout) beats any allow from any source, and a non-interactive pass cannot
 answer an ask prompt, so the pass dies mid-run. `ticket-loop.sh` preflights
 these files (plus `~/.claude/settings.json`) against the full carried verb
-set of both passes and fails fast naming the offending rule; remove or relax
-it before onboarding a repo. (`--afk` skips permissions for the implement
-pass only — the review pass always runs under permissions.) The carried sets
+set of the passes and fails fast naming the offending rule; remove or relax
+it before onboarding a repo. (`--afk` skips permissions for the implement and
+repair passes only — the review pass always runs under permissions.) The carried sets
 and the preflight's checked set are one definition in the runner — see
 *Capability contracts* above.
 

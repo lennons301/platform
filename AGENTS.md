@@ -85,10 +85,16 @@ docs/                — presentations and design specs
   onboarding" in `choices/ai-dev-workflow.md`
 - Each headless ticket-loop pass pre-approves exactly the command verbs its
   prompt (or the ticket-reviewer agent definition) instructs, rendered from
-  the `IMPLEMENT_VERBS`/`REVIEW_VERBS` arrays in `scripts/ticket-loop.sh`
-  that also feed the permission preflight — changing a pass prompt or
-  `templates/agents/ticket-reviewer.md` means updating the matching array
-  (see "Capability contracts" in `choices/ai-dev-workflow.md`)
+  the `IMPLEMENT_VERBS`/`REPAIR_VERBS`/`REVIEW_VERBS` arrays in
+  `scripts/ticket-loop.sh` that also feed the permission preflight — changing
+  a pass prompt or `templates/agents/ticket-reviewer.md` means updating the
+  matching array (see "Capability contracts" in `choices/ai-dev-workflow.md`)
+- `scripts/ticket-loop.sh` dispatches on an existing open PR's state before
+  working a ticket: `CONFLICTING` runs a repair pass (merge the default
+  branch, never rebase/force-push; no attempt consumed), `MERGEABLE`+approved
+  exits 0 (parked awaiting human merge), `MERGEABLE`+unreviewed runs gates +
+  review only (see "PR-state dispatch & the repair pass" in
+  `choices/ai-dev-workflow.md`)
 - Per-ticket workflows are selected by a `workflow:<skill>` label whose name is
   the mattpocock skill name (`workflow:tdd` → `/tdd`) — no menu files exist by
   design; the model-invocable skills are the menu
