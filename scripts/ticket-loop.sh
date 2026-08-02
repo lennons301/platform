@@ -120,7 +120,7 @@ REVIEW_VERBS=(
 # Repair pass (prompt in the mergeability section below): merge the moved
 # default branch into the PR branch, resolve the conflicts, re-run the
 # checks, push. The implement set minus the PR-creation verbs
-# (gh pr list / create / edit), plus git fetch and git merge. Merge only —
+# (gh pr list / create / edit) — git fetch / git merge stay. Merge only —
 # no rebase, no force-push, in any headless contract.
 REPAIR_VERBS=(
   "gh issue view"
@@ -267,7 +267,9 @@ DEFAULT_BRANCH="$(gh repo view --json defaultBranchRef --jq .defaultBranchRef.na
 pr_merge_state() {
   local TRY STATE
   for TRY in $(seq 1 20); do
-    STATE="$(gh pr view "$1" --json mergeable --jq '.mergeable // "UNKNOWN"')"
+    # || true: a transient gh failure is one failed try, not (via errexit) a
+    # dead run — the empty STATE falls through to the retry like UNKNOWN does.
+    STATE="$(gh pr view "$1" --json mergeable --jq '.mergeable // "UNKNOWN"' || true)"
     case "$STATE" in MERGEABLE|CONFLICTING) printf '%s' "$STATE"; return 0 ;; esac
     sleep 3
   done

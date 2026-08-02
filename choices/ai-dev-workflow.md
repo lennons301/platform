@@ -160,8 +160,8 @@ PR's state first and does only the work that state calls for, instead of
 burning one of the limited implement attempts regardless.
 
 After ticket selection, if an open PR exists for the issue branch
-(`agent/issue-N`), the runner polls `gh pr view --json
-mergeable,reviewDecision` — retrying while `mergeable` is `UNKNOWN`, which
+(`agent/issue-N`), the runner reads the PR's `mergeable` and `reviewDecision`
+(`gh pr view --json …`) — polling while `mergeable` is `UNKNOWN`, which
 means "GitHub hasn't computed it yet" and is never treated as a verdict either
 way — then dispatches:
 
@@ -224,8 +224,9 @@ Instances:
   consumers. Changing a pass prompt (or `templates/agents/ticket-reviewer.md`,
   which the review pass launches) means updating the matching array in the
   same change. `REPAIR_VERBS` is the implement set minus the PR-creation
-  verbs (`gh pr list` / `create` / `edit`), plus `git fetch` / `git merge` —
-  no rebase or force-push verb appears in any headless contract.
+  verbs (`gh pr list` / `create` / `edit`), keeping `git fetch` /
+  `git merge` — no rebase or force-push verb appears in any headless
+  contract.
 - **Interlude's Phase 5 native executor** provides capabilities
   architecturally (`--dangerously-skip-permissions` inside isolated
   containers, GitHub side-effects moved to the orchestrator, git via
@@ -283,7 +284,7 @@ invites + accepts the reviewer as a write collaborator.
 definition it launches) instructs — the implement pass's workflow verbs
 (issue read/comment/relabel, stage/commit, push, fetch/merge the default
 branch, PR create/update, `doppler run`), the repair pass's conflict-repair
-verbs (the implement set minus PR creation, plus `git fetch` / `git merge`),
+verbs (the implement set minus PR creation, keeping `git fetch` / `git merge`),
 and the review pass's reviewer verbs (issue/PR read, CI
 checks, review submission, auto-merge disarm, labelling). Onboarding
 therefore does not depend on a repo's interactively-grown allowlist: on a
