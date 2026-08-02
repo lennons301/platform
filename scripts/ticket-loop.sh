@@ -2,8 +2,10 @@
 # ticket-loop.sh — thin per-ticket runner for the ticket-loop workflow
 # (see choices/ai-dev-workflow.md).
 #
-# One invocation = one ticket, one attempt:
-#   pick a ready-for-agent issue -> worktree -> implement pass (claude -p)
+# One invocation = one ticket, at most one implement attempt:
+#   pick a ready-for-agent issue -> dispatch on any existing open PR's state
+#   (see "PR-state dispatch" below: conflicting PRs get a repair pass, parked
+#   approved PRs exit early) -> worktree -> implement pass (claude -p)
 #   -> deterministic review gates (arm auto-merge, or human-signoff)
 #   -> review pass (fresh context, reviewer identity) -> report.
 #
@@ -24,8 +26,9 @@
 #   --issue N      work this issue instead of picking the oldest ready-for-agent
 #   --repo-dir     project repo to operate on (default: current directory)
 #   --afk          fully unattended: passes --dangerously-skip-permissions to
-#                  the implement pass. Only for repos where issue creation and
-#                  labelling are restricted to you (prompt-injection caution).
+#                  the implement and repair passes. Only for repos where issue
+#                  creation and labelling are restricted to you
+#                  (prompt-injection caution).
 #
 # Requires: gh (authenticated), git, claude, yq, jq, doppler (logged in; the
 # reviewer PAT lives in Doppler — see 'Reviewer identity & onboarding' in
@@ -75,8 +78,10 @@ REPO_NAME="$(basename "$REPO_ROOT")"
 # or fall to the repo's own allowlist.
 
 # Implement pass (prompt below): read the issue, stage + commit, push, open
-# or update the PR, run checks under doppler-injected env, and the escape
-# hatch when blocked (comment on the issue + relabel ready-for-human).
+# or update the PR, run checks under doppler-injected env, leave the PR
+# mergeable (fetch + merge the moved default branch — the exit criterion),
+# and the escape hatch when blocked (comment on the issue + relabel
+# ready-for-human).
 IMPLEMENT_VERBS=(
   "gh issue view"
   "gh issue comment"
@@ -84,6 +89,8 @@ IMPLEMENT_VERBS=(
   "git add"
   "git commit"
   "git push"
+  "git fetch"
+  "git merge"
   "gh pr list"
   "gh pr view"
   "gh pr create"
@@ -110,6 +117,24 @@ REVIEW_VERBS=(
   "doppler run"
 )
 
+# Repair pass (prompt in the mergeability section below): merge the moved
+# default branch into the PR branch, resolve the conflicts, re-run the
+# checks, push. The implement set minus the PR-creation verbs
+# (gh pr list / create / edit) — git fetch / git merge stay. Merge only —
+# no rebase, no force-push, in any headless contract.
+REPAIR_VERBS=(
+  "gh issue view"
+  "gh issue comment"
+  "gh issue edit"
+  "git add"
+  "git commit"
+  "git push"
+  "git fetch"
+  "git merge"
+  "gh pr view"
+  "doppler run"
+)
+
 # "git push" "doppler run" -> "Bash(git push:*),Bash(doppler run:*)"
 allowed_tools() {
   local CSV="" VERB
@@ -124,13 +149,13 @@ allowed_tools() {
 # source, and a non-interactive pass cannot answer an ask prompt, so the pass
 # dies mid-run (worktree sessions resolve .claude/settings*.json to this
 # checkout). Fail fast naming the offending rule instead. --afk skips
-# permissions for the implement pass only — the review pass always runs under
-# permissions, so its verbs are checked regardless.
+# permissions for the implement and repair passes only — the review pass
+# always runs under permissions, so its verbs are checked regardless.
 command -v jq > /dev/null || { echo "ERROR: jq is required." >&2; exit 1; }
 if [ -n "$AFK" ]; then
   PREFLIGHT_VERBS=("${REVIEW_VERBS[@]}")
 else
-  PREFLIGHT_VERBS=("${IMPLEMENT_VERBS[@]}" "${REVIEW_VERBS[@]}")
+  PREFLIGHT_VERBS=("${IMPLEMENT_VERBS[@]}" "${REPAIR_VERBS[@]}" "${REVIEW_VERBS[@]}")
 fi
 BLOCKING=""
 for SETTINGS in "$HOME/.claude/settings.json" \
@@ -155,8 +180,8 @@ if [ -n "$BLOCKING" ]; then
   printf '%s' "$BLOCKING" | sed 's/^/    /' >&2
   echo "    These beat --allowedTools (deny -> ask -> allow, first match wins), and a" >&2
   echo "    non-interactive pass cannot answer an ask prompt. Remove or relax the rule(s)." >&2
-  echo "    (--afk skips permissions for the implement pass only; the review pass always" >&2
-  echo "    runs under permissions.) See 'Repo permission rules' in choices/ai-dev-workflow.md." >&2
+  echo "    (--afk skips permissions for the implement and repair passes only; the review" >&2
+  echo "    pass always runs under permissions.) See 'Repo permission rules' in choices/ai-dev-workflow.md." >&2
   exit 1
 fi
 
@@ -216,36 +241,97 @@ fi
 
 echo "==> Issue #$ISSUE in $REPO_NAME"
 
+BRANCH="agent/issue-$ISSUE"
+DEFAULT_BRANCH="$(gh repo view --json defaultBranchRef --jq .defaultBranchRef.name)"
+
+# --- PR-state dispatch ---------------------------------------------------------
+# Parked PRs go stale underneath this loop: gated (human-signoff) PRs wait
+# for a human merge, and each human merge can flip the still-parked ones to
+# CONFLICTING (and the eventual fix-push dismisses the reviewer's approval —
+# stale-approval dismissal is deliberate). So when the issue already has an
+# open PR, read its state first and do only the work that state calls for,
+# instead of burning one of the limited implement attempts regardless:
+#
+#   CONFLICTING                   -> repair pass (merge the default branch,
+#                                    resolve, push), then gates + review
+#   MERGEABLE + APPROVED          -> parked awaiting human merge; exit 0
+#   MERGEABLE + CHANGES_REQUESTED -> implement attempt (the work is
+#                                    addressing the feedback) — unchanged
+#   MERGEABLE + not reviewed      -> gates + review only (an approval was
+#                                    dismissed, or a runner died mid-run)
+#   no open PR                    -> implement attempt — unchanged
+
+# GitHub computes mergeability lazily: `mergeable` reads UNKNOWN until a
+# background job finishes, and UNKNOWN means "not computed yet" — never a
+# verdict either way. Poll until it resolves; fail rather than guess.
+pr_merge_state() {
+  local TRY STATE
+  for TRY in $(seq 1 20); do
+    # || true: a transient gh failure is one failed try, not (via errexit) a
+    # dead run — the empty STATE falls through to the retry like UNKNOWN does.
+    STATE="$(gh pr view "$1" --json mergeable --jq '.mergeable // "UNKNOWN"' || true)"
+    case "$STATE" in MERGEABLE|CONFLICTING) printf '%s' "$STATE"; return 0 ;; esac
+    sleep 3
+  done
+  echo "==> ERROR: PR #$1 mergeability still UNKNOWN after ~60s of polling —" >&2
+  echo "    GitHub has not computed it yet. Re-run shortly; UNKNOWN is never treated as a verdict." >&2
+  return 1
+}
+
+MODE="implement"
+PR="$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number // empty')"
+if [ -n "$PR" ]; then
+  MERGE_STATE="$(pr_merge_state "$PR")"
+  REVIEW_DECISION="$(gh pr view "$PR" --json reviewDecision --jq '.reviewDecision // ""')"
+  if [ "$MERGE_STATE" = "CONFLICTING" ]; then
+    MODE="repair"
+    echo "==> Open PR #$PR is CONFLICTING — repair pass instead of an implement attempt."
+  elif [ "$REVIEW_DECISION" = "APPROVED" ]; then
+    echo "==> Open PR #$PR is MERGEABLE and APPROVED — parked awaiting human merge. Nothing to do."
+    exit 0
+  elif [ "$REVIEW_DECISION" = "CHANGES_REQUESTED" ]; then
+    echo "==> Open PR #$PR has changes requested — implement attempt addresses the feedback."
+  else
+    MODE="review-only"
+    echo "==> Open PR #$PR is MERGEABLE but not approved — running gates + review only."
+  fi
+fi
+
 # --- Attempt accounting ------------------------------------------------------
 # Attempts are visible on the issue as comments; after MAX_ATTEMPTS the ticket
-# goes back to a human instead of thrashing.
+# goes back to a human instead of thrashing. Only implement attempts count:
+# a repair pass posts its own 🔧 marker (deliberately not matching the
+# "🤖 Attempt" prefix counted here) and a gates+review-only run posts nothing.
 
-ATTEMPT=$(( $(gh issue view "$ISSUE" --comments --json comments \
-  --jq '[.comments[].body | select(startswith("🤖 Attempt"))] | length') + 1 ))
+if [ "$MODE" = "implement" ]; then
+  ATTEMPT=$(( $(gh issue view "$ISSUE" --comments --json comments \
+    --jq '[.comments[].body | select(startswith("🤖 Attempt"))] | length') + 1 ))
 
-if [ "$ATTEMPT" -gt "$MAX_ATTEMPTS" ]; then
-  echo "Issue #$ISSUE already has $((ATTEMPT - 1)) attempts. Flagging for a human."
-  # Label ops use REST: gh's GraphQL editors (gh pr/issue edit) query the
-  # sunset projectCards field and error out (observed 2026-07-28, gh 2.45).
-  gh api "repos/{owner}/{repo}/issues/$ISSUE/labels" -f 'labels[]=ready-for-human' > /dev/null
-  gh api -X DELETE "repos/{owner}/{repo}/issues/$ISSUE/labels/ready-for-agent" > /dev/null || true
-  gh issue comment "$ISSUE" --body "🤖 $((ATTEMPT - 1)) agent attempts without an approved PR — flagging ready-for-human."
-  exit 1
+  if [ "$ATTEMPT" -gt "$MAX_ATTEMPTS" ]; then
+    echo "Issue #$ISSUE already has $((ATTEMPT - 1)) attempts. Flagging for a human."
+    # Label ops use REST: gh's GraphQL editors (gh pr/issue edit) query the
+    # sunset projectCards field and error out (observed 2026-07-28, gh 2.45).
+    gh api "repos/{owner}/{repo}/issues/$ISSUE/labels" -f 'labels[]=ready-for-human' > /dev/null
+    gh api -X DELETE "repos/{owner}/{repo}/issues/$ISSUE/labels/ready-for-agent" > /dev/null || true
+    gh issue comment "$ISSUE" --body "🤖 $((ATTEMPT - 1)) agent attempts without an approved PR — flagging ready-for-human."
+    exit 1
+  fi
+  gh issue comment "$ISSUE" --body "🤖 Attempt $ATTEMPT/$MAX_ATTEMPTS starting." > /dev/null
+  echo "==> Attempt $ATTEMPT/$MAX_ATTEMPTS"
 fi
-gh issue comment "$ISSUE" --body "🤖 Attempt $ATTEMPT/$MAX_ATTEMPTS starting." > /dev/null
-echo "==> Attempt $ATTEMPT/$MAX_ATTEMPTS"
 
 # --- Worktree ----------------------------------------------------------------
 
-BRANCH="agent/issue-$ISSUE"
 WORKTREE="$(git rev-parse --show-toplevel)/../${REPO_NAME}-issue-${ISSUE}"
-
-DEFAULT_BRANCH="$(gh repo view --json defaultBranchRef --jq .defaultBranchRef.name)"
 
 if [ ! -d "$WORKTREE" ]; then
   git fetch origin "$DEFAULT_BRANCH"
   if git show-ref --verify --quiet "refs/heads/$BRANCH"; then
     git worktree add "$WORKTREE" "$BRANCH"
+  elif git fetch origin "$BRANCH" > /dev/null 2>&1; then
+    # The branch lives only on origin (an open PR can outlive this machine's
+    # worktree and local branch) — start from the PR branch, not the default.
+    git worktree add -b "$BRANCH" "$WORKTREE" "origin/$BRANCH"
   else
     git worktree add -b "$BRANCH" "$WORKTREE" "origin/$DEFAULT_BRANCH"
   fi
@@ -255,16 +341,17 @@ echo "==> Worktree: $WORKTREE"
 # --- Implement pass ----------------------------------------------------------
 # Fresh claude process, fresh context. The ticket is the spec.
 
-# Non-interactive sessions can't answer permission prompts, so pre-approve
-# the pass's capability contract (IMPLEMENT_VERBS above) — everything the
-# prompt below instructs the agent to run.
-IMPLEMENT_FLAGS=(--permission-mode acceptEdits
-  --allowedTools "$(allowed_tools "${IMPLEMENT_VERBS[@]}")")
-[ -n "$AFK" ] && IMPLEMENT_FLAGS=(--dangerously-skip-permissions)
+if [ "$MODE" = "implement" ]; then
+  # Non-interactive sessions can't answer permission prompts, so pre-approve
+  # the pass's capability contract (IMPLEMENT_VERBS above) — everything the
+  # prompt below instructs the agent to run.
+  IMPLEMENT_FLAGS=(--permission-mode acceptEdits
+    --allowedTools "$(allowed_tools "${IMPLEMENT_VERBS[@]}")")
+  [ -n "$AFK" ] && IMPLEMENT_FLAGS=(--dangerously-skip-permissions)
 
-# NB: prompt must come BEFORE the flags — --allowedTools is variadic and
-# would swallow a trailing prompt as another tool pattern.
-(cd "$WORKTREE" && claude -p "
+  # NB: prompt must come BEFORE the flags — --allowedTools is variadic and
+  # would swallow a trailing prompt as another tool pattern.
+  (cd "$WORKTREE" && claude -p "
 Work GitHub issue #$ISSUE of this repo. This is attempt $ATTEMPT of $MAX_ATTEMPTS.
 
 1. Read the issue in full (gh issue view $ISSUE --comments). The ticket is the
@@ -284,14 +371,82 @@ Work GitHub issue #$ISSUE of this repo. This is attempt $ATTEMPT of $MAX_ATTEMPT
    ticket-reviewer with fresh eyes is still the thing that approves.
 6. Push the branch and open a PR titled after the issue, whose body starts
    with 'Closes #$ISSUE'. If a PR for this branch already exists, push to it.
-7. If you are genuinely blocked (missing decision, contradictory spec),
+7. Before finishing, confirm the PR is mergeable: gh pr view --json mergeable
+   must report MERGEABLE. If it reports CONFLICTING, integrate the current
+   default branch — git fetch origin, then git merge origin/$DEFAULT_BRANCH
+   (merge only, never rebase, never force-push) — resolve the conflicts,
+   re-run the checks, and push again.
+8. If you are genuinely blocked (missing decision, contradictory spec),
    comment your findings on issue #$ISSUE, label it ready-for-human, and stop.
 " "${IMPLEMENT_FLAGS[@]}")
 
-PR="$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number // empty')"
-if [ -z "$PR" ]; then
-  echo "==> No open PR for $BRANCH after implement pass; see issue #$ISSUE for why."
-  exit 1
+  PR="$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number // empty')"
+  if [ -z "$PR" ]; then
+    echo "==> No open PR for $BRANCH after implement pass; see issue #$ISSUE for why."
+    exit 1
+  fi
+fi
+
+# --- Mergeability guarantee & repair pass --------------------------------------
+# The implement prompt asks the agent to leave the PR mergeable, but the
+# runner is the deterministic guarantor: whichever route got here (a fresh
+# implement pass, or a dispatch straight to repair), a CONFLICTING PR gets
+# exactly one repair pass — a fresh headless session in the issue worktree
+# that merges the default branch (merge only — never rebase, never
+# force-push), resolves the conflicts, re-runs the repo's checks, and pushes.
+# Success falls through to the gates + review sections UNCHANGED: a
+# resolution that newly touches a gated path re-gates the PR, and an approval
+# the fix-push dismissed gets its review rerun without further wiring. Still
+# CONFLICTING after the repair -> escape hatch (findings on the issue,
+# relabel ready-for-human), exit non-zero. Fail fast — no retry loop.
+
+if [ "$MODE" != "review-only" ]; then
+  MERGE_STATE="$(pr_merge_state "$PR")"
+  if [ "$MERGE_STATE" = "CONFLICTING" ]; then
+    echo "==> PR #$PR is CONFLICTING with $DEFAULT_BRANCH — running repair pass."
+    # Distinct marker: must NOT match the "🤖 Attempt" prefix the attempt
+    # counter greps for — repairs never consume an attempt.
+    gh issue comment "$ISSUE" --body "🔧 Repair pass starting — merging $DEFAULT_BRANCH into PR #$PR to resolve conflicts." > /dev/null
+
+    # Pre-approve the repair pass's capability contract (REPAIR_VERBS above);
+    # --afk is honoured the same way as the implement pass. Same NB: the
+    # prompt must come BEFORE --allowedTools.
+    REPAIR_FLAGS=(--permission-mode acceptEdits
+      --allowedTools "$(allowed_tools "${REPAIR_VERBS[@]}")")
+    [ -n "$AFK" ] && REPAIR_FLAGS=(--dangerously-skip-permissions)
+
+    (cd "$WORKTREE" && claude -p "
+PR #$PR (branch $BRANCH) for issue #$ISSUE is CONFLICTING with
+$DEFAULT_BRANCH — the default branch has moved underneath it. Repair the PR
+so it is mergeable again. Merge only: never rebase, never force-push.
+
+1. Read the issue for context (gh issue view $ISSUE --comments) and check the
+   PR (gh pr view $PR).
+2. Integrate the default branch: git fetch origin, then
+   git merge origin/$DEFAULT_BRANCH.
+3. Resolve the conflicts with the /resolving-merge-conflicts skill; stage the
+   resolved files (git add) and complete the merge (git commit).
+4. Validate: run the repo's tests and lint (just test / just lint if a
+   justfile exists; wrap in 'doppler run --' if the checks need the repo's
+   env — that wrapper is pre-approved). Do not push failing checks.
+5. Push the branch (git push) and confirm the PR reports MERGEABLE
+   (gh pr view $PR --json mergeable).
+6. If you cannot produce a sound resolution (the conflict needs a decision
+   only a human can make), comment your findings on issue #$ISSUE, label it
+   ready-for-human, and stop.
+" "${REPAIR_FLAGS[@]}")
+
+    MERGE_STATE="$(pr_merge_state "$PR")"
+    if [ "$MERGE_STATE" = "CONFLICTING" ]; then
+      echo "==> PR #$PR is still CONFLICTING after the repair pass. Flagging for a human." >&2
+      gh issue comment "$ISSUE" --body "🔧 Repair pass could not make PR #$PR mergeable — still CONFLICTING with $DEFAULT_BRANCH after a merge attempt. The conflicts need a human resolution (merge, never rebase). Flagging ready-for-human."
+      # REST, not gh issue edit — see the projectCards note above.
+      gh api "repos/{owner}/{repo}/issues/$ISSUE/labels" -f 'labels[]=ready-for-human' > /dev/null
+      gh api -X DELETE "repos/{owner}/{repo}/issues/$ISSUE/labels/ready-for-agent" > /dev/null || true
+      exit 1
+    fi
+    echo "==> Repair pass done — PR #$PR is MERGEABLE; continuing to gates + review."
+  fi
 fi
 
 # --- Deterministic review gates ------------------------------------------------
@@ -387,4 +542,8 @@ then relay its verdict verbatim.
 Context for the reviewer: $GATE_NOTE
 " --allowedTools "$(allowed_tools "${REVIEW_VERBS[@]}")")
 
-echo "==> Done. Issue #$ISSUE, PR #$PR, attempt $ATTEMPT."
+case "$MODE" in
+  implement)   echo "==> Done. Issue #$ISSUE, PR #$PR, attempt $ATTEMPT." ;;
+  repair)      echo "==> Done. Issue #$ISSUE, PR #$PR, repair pass (no attempt consumed)." ;;
+  review-only) echo "==> Done. Issue #$ISSUE, PR #$PR, gates + review only (no attempt consumed)." ;;
+esac
