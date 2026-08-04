@@ -79,6 +79,55 @@ The CI workflow does not need to deploy. Its job is to gate the merge.
 
 For projects not on Vercel (e.g., Interlude on Hetzner), add a deploy step to the workflow or use a separate `deploy.yml` triggered on push to main.
 
+### 5. Milestone auto-close (opt-in)
+
+GitHub gives a milestone a free "X of Y closed" progress bar, but never flips the
+milestone's own state — it sits at `open`, 100% complete, until someone closes it
+by hand. If you group tickets under milestones, opt in to the estate's reusable
+workflow so "milestone closed" is a trustworthy done signal.
+
+Copy `templates/milestone-autoclose.yml.tmpl` from this repo to
+`.github/workflows/milestone-autoclose.yml`:
+
+```yaml
+name: Milestone Auto-Close
+
+on:
+  issues:
+    types: [closed]
+
+jobs:
+  autoclose:
+    permissions:
+      contents: read
+      issues: write
+    uses: lennons301/platform/.github/workflows/milestone-autoclose.yml@master
+```
+
+Behaviour: when an issue closes, its milestone is closed **only** if no open
+issues remain on it (open PRs assigned to the milestone count as open work).
+It is a no-op otherwise and idempotent on an already-closed milestone, so
+reopening and re-closing issues is safe.
+
+- **Permissions** — the caller's `GITHUB_TOKEN` is enough: `issues: write` for
+  the milestone (milestones live under the issues scope) and `contents: read`
+  for the step that checks the platform script out. A called workflow's token
+  can only be as narrow as the caller's, and naming any scope in a
+  `permissions:` block drops every scope you leave out to `none` — so both
+  lines above are required, not decorative. Only cross-repo milestones need a
+  PAT (`gh_token` secret).
+- **Opt out per milestone** — put `[no-autoclose]` anywhere in a milestone's
+  description to keep a rolling milestone open.
+- **Optional comment** — pass `with: {comment-on-issue: true}` to have the
+  closing issue get a note explaining the auto-closure.
+- **Private platform repo** — if `lennons301/platform` is not readable by the
+  caller's `GITHUB_TOKEN`, pass `secrets: {platform_token: ...}` with a PAT that
+  can read it; the workflow checks the platform repo out to run its script.
+
+The logic lives in `scripts/milestone-autoclose.sh` in this repo (runnable
+locally with `--dry-run`), so fixes reach every product without a copy-paste
+round.
+
 ## Conventions
 
 - The workflow file is called `ci.yml` (not `test.yml`, `checks.yml`, etc.)

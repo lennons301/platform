@@ -62,6 +62,10 @@ docs/                — presentations and design specs
 # Onboard a repo to the separate-reviewer-identity flow (idempotent): branch
 # protection, auto-merge, human-signoff + workflow:* labels, reviewer collaborator
 ./scripts/setup-reviewer.sh --repo-dir <project-path>
+
+# Close a milestone once its last open issue closes (what the reusable
+# milestone-autoclose workflow runs; safe to try locally with --dry-run)
+./scripts/milestone-autoclose.sh --repo <owner/name> --milestone <n> [--dry-run]
 ```
 
 ## Key Conventions
@@ -100,6 +104,12 @@ docs/                — presentations and design specs
   design; the model-invocable skills are the menu
 - `wayfinder:*` issues are decision tickets and are refused by
   `scripts/ticket-loop.sh` — filtered from the auto-pick, an error via `--issue`
+- Estate-wide GitHub automation is published from this repo as a `workflow_call`
+  reusable workflow whose logic lives in a tested `scripts/*.sh`, with a caller
+  stub in `templates/*.yml.tmpl` that products copy — currently
+  `milestone-autoclose` (see "Milestone auto-close" in `choices/ci-cd.md`).
+  Reusable workflows check the platform repo out at `github.job_workflow_sha`
+  so script and workflow always come from the same commit
 - Check output line format (`  <dim>: ✓|✗|✓* (details)`) is a parsed contract — changes require updating `parse_check_output` in checks/lib.sh and checks/tests/test-parse.sh
 - Adding a check means registering it in `checks/check-all.sh` **and** bumping the dimension count in `checks/tests/test-snapshot.sh`
 - `create-issues.sh` routes gaps by dimension: mechanical ones get `platform-upgrade`, ones needing a human decision get `ready-for-human` (see `issue_label`)
