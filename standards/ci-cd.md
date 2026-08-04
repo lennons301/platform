@@ -17,6 +17,8 @@ Code is never merged without passing automated checks. Deployments are automated
 ## Guidance
 
 - Keep CI fast. Developers and agents should not wait more than a few minutes for feedback.
+- Automation that is the same everywhere lives in the platform repo as a reusable workflow and is called, not copied. Products opt in with a caller workflow so a fix reaches the whole estate at once (currently: milestone auto-close — see `choices/ci-cd.md`).
+- Project bookkeeping that a human would otherwise have to remember is automated. If a repo groups issues under milestones, it opts in to milestone auto-close so a closed milestone actually means "finished".
 - CI should run the same commands as local development (the same lint, test, and type-check commands documented in the justfile/CLAUDE.md).
 - Secrets in CI are injected from the secrets provider using scoped service tokens — never hardcoded in workflow files.
 - The specific CI platform is a project-level decision (GitHub Actions is the current default for this estate), but the requirements above apply regardless of platform.
