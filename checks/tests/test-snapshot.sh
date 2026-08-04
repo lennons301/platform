@@ -15,9 +15,13 @@ assert_eq "one product checked" "1" "$(jq '.total_products_checked' "$SNAPSHOT")
 assert_eq "product name" "testproj" "$(jq -r '.products[0].name' "$SNAPSHOT")"
 assert_eq "product repo" "example/testproj" "$(jq -r '.products[0].repo' "$SNAPSHOT")"
 assert_eq "product checked" "true" "$(jq '.products[0].checked' "$SNAPSHOT")"
-assert_eq "11 dimensions recorded" "11" "$(jq '.products[0].dimensions | length' "$SNAPSHOT")"
+assert_eq "12 dimensions recorded" "12" "$(jq '.products[0].dimensions | length' "$SNAPSHOT")"
 assert_eq "documentation dimension fails" "fail" \
   "$(jq -r '.products[0].dimensions[] | select(.dimension == "documentation") | .status' "$SNAPSHOT")"
+# The fixture declares no ai_workflow, so review-gate is out of scope — but it
+# must still reach the snapshot, or the dimension is invisible to the dashboard.
+assert_eq "review-gate dimension recorded as out of scope" "divergence" \
+  "$(jq -r '.products[0].dimensions[] | select(.dimension == "review-gate") | .status' "$SNAPSHOT")"
 assert_eq "gap_count equals failed-dimension count" \
   "$(jq '[.products[0].dimensions[] | select(.status == "fail")] | length' "$SNAPSHOT")" \
   "$(jq '.products[0].gap_count' "$SNAPSHOT")"

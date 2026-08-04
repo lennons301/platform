@@ -85,6 +85,22 @@ require_jq() {
   fi
 }
 
+# Is the gh CLI available and authenticated? Prints why not on stdout and
+# returns 1; returns 0 silently when it is.
+# Checks that read the GitHub API use this to warn-and-skip rather than let
+# absent credentials count as a conformity gap — a machine without a token
+# knows nothing about the repo either way (see check-review-gate.sh).
+gh_ready() {
+  if ! command -v gh &> /dev/null; then
+    echo "gh CLI not installed"
+    return 1
+  fi
+  if ! gh auth status &> /dev/null; then
+    echo "gh CLI not authenticated"
+    return 1
+  fi
+}
+
 # Parse check output into TSV: dimension<TAB>status<TAB>details
 # Reads stdin, writes stdout. Non-matching lines are ignored.
 # Symbol mapping: ✓ -> pass, ✗ -> fail, ✓* -> divergence, ~ -> warn.

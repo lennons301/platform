@@ -41,6 +41,7 @@ standard_doc() {
   case "$1" in
     versions) echo "versions/manifest.yaml" ;;
     architecture) echo "standards/architecture-diagrams.md" ;;
+    review-gate) echo "standards/review-gates.md" ;;
     *) echo "standards/$1.md" ;;
   esac
 }
@@ -51,6 +52,11 @@ standard_doc() {
 issue_label() {
   case "$1" in
     domain-modelling) echo "ready-for-human" ;;
+    # Four of the five review-gate dimensions (collaborator, branch protection,
+    # allow_auto_merge, label) are admin-scoped API writes, and the remedy needs
+    # a Doppler-held reviewer PAT to accept the invitation. An agent holds
+    # neither, so this is human work by construction.
+    review-gate) echo "ready-for-human" ;;
     *) echo "platform-upgrade" ;;
   esac
 }
@@ -78,6 +84,31 @@ mean "nothing qualified" rather than "never done".
 **Do not relabel this `ready-for-agent`.** An agent inventing a domain model
 unattended produces plausible fiction that every later session then treats as
 authoritative.
+REMEDY
+      ;;
+    review-gate)
+      cat <<'REMEDY'
+
+## How to close this
+
+Onboard the repo, from the platform repo:
+
+```bash
+./scripts/setup-reviewer.sh --repo-dir <path-to-this-checkout>
+```
+
+It is idempotent and sets up every dimension the check audits. Two caveats:
+
+- It needs a token with admin rights on this repo, plus Doppler access to the
+  reviewer PAT (`platform`/`prd`/`REVIEWER_GH_TOKEN`) to accept the collaborator
+  invitation — see "Reviewer identity & onboarding" in
+  `choices/ai-dev-workflow.md`.
+- It only *seeds* `docs/agents/review-gates.yaml` in the working tree. The
+  check reads a fresh clone, so that dimension closes when the file is
+  committed.
+
+**Do not relabel this `ready-for-agent`.** The remaining work is admin-scoped
+API calls an agent has no credentials for.
 REMEDY
       ;;
     *) : ;;

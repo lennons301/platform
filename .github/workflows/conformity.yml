@@ -42,6 +42,10 @@ jobs:
         run: |
           mkdir -p data
           ./checks/check-estate.sh --repos-dir /tmp/repos --json data/conformity-snapshot.json
+        env:
+          # check-review-gate.sh reads repo settings, branch protection, labels
+          # and collaborators via the API; without a token it warns and skips.
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
 
       - name: Commit snapshot if semantically changed
         run: |
