@@ -85,6 +85,19 @@ require_jq() {
   fi
 }
 
+# Check that gh is available and authenticated
+require_gh() {
+  if ! command -v gh &> /dev/null; then
+    echo "ERROR: gh CLI is required but not installed." >&2
+    echo "Install: https://cli.github.com/" >&2
+    exit 1
+  fi
+  if ! gh auth status &> /dev/null; then
+    echo "ERROR: gh CLI is not authenticated. Run: gh auth login" >&2
+    exit 1
+  fi
+}
+
 # Parse check output into TSV: dimension<TAB>status<TAB>details
 # Reads stdin, writes stdout. Non-matching lines are ignored.
 # Symbol mapping: ✓ -> pass, ✗ -> fail, ✓* -> divergence, ~ -> warn.
