@@ -52,7 +52,27 @@ changes you would happily auto-land → delete the glob. A bad auto-merge →
 add a glob that would have caught it. Adjustments are data edits, not prompt
 edits.
 
+## Onboarding requirements
+
+A repo on `choices.ai_workflow: ticket-loop` must be able to *route* to a
+human, which takes five things — audited by `checks/check-review-gate.sh` so a
+repo flipped to the loop without onboarding surfaces in the estate audit
+rather than at review time:
+
+1. The reviewer machine account (`REVIEWER_LOGIN`, default
+   `lennons301-reviewer`) is a collaborator — otherwise it cannot approve.
+2. Default-branch protection requires at least 1 approving review with
+   `dismiss_stale_reviews` — without it, "approval" gates nothing.
+3. `allow_auto_merge` is enabled on the repo, so an approval can arm a merge.
+4. The `human-signoff` label exists, so a gated PR can be marked.
+5. `docs/agents/review-gates.yaml` is committed (requirement 2 above).
+
+The four API-side dimensions need an authenticated `gh`; without one the check
+warns and skips rather than reporting a gap it cannot substantiate.
+
 ## How to comply
 
 Run `scripts/setup-reviewer.sh` when onboarding a repo to the ticket-loop
-(see `choices/ai-dev-workflow.md`); it seeds the repo's extension stub.
+(see `choices/ai-dev-workflow.md`); it seeds the repo's extension stub and
+sets up all five requirements above (idempotent, so re-running it closes a
+`review-gate` gap).

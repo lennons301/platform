@@ -85,16 +85,19 @@ require_jq() {
   fi
 }
 
-# Check that gh is available and authenticated
-require_gh() {
+# Is the gh CLI available and authenticated? Prints why not on stdout and
+# returns 1; returns 0 silently when it is.
+# Checks that read the GitHub API use this to warn-and-skip rather than let
+# absent credentials count as a conformity gap — a machine without a token
+# knows nothing about the repo either way (see check-review-gate.sh).
+gh_ready() {
   if ! command -v gh &> /dev/null; then
-    echo "ERROR: gh CLI is required but not installed." >&2
-    echo "Install: https://cli.github.com/" >&2
-    exit 1
+    echo "gh CLI not installed"
+    return 1
   fi
   if ! gh auth status &> /dev/null; then
-    echo "ERROR: gh CLI is not authenticated. Run: gh auth login" >&2
-    exit 1
+    echo "gh CLI not authenticated"
+    return 1
   fi
 }
 

@@ -11,12 +11,15 @@
 
 source "$(dirname "$0")/lib.sh"
 require_yq
-require_jq
 
 PROJECT_PATH="$1"
 PRODUCT_YAML="$2"
 
-if has_divergence "$PRODUCT_YAML" "review-gate"; then
+# Both spellings are honoured: the dimension name and the standard's filename
+# (standards/review-gates.md) are both plausible things to write, and a
+# divergence that silently fails to register is worse than a lenient match.
+if has_divergence "$PRODUCT_YAML" "review-gate" ||
+   has_divergence "$PRODUCT_YAML" "review-gates"; then
   echo -e "  review-gate: ${DIVG} (intentional divergence)"
   exit 0
 fi
@@ -33,7 +36,16 @@ if [ -z "$REPO" ] || [ "$REPO" = "null" ]; then
   exit 1
 fi
 
-require_gh
+# The four API-side dimensions need a token; the fifth (the repo's gate
+# extension file) is on disk. Without credentials this machine cannot tell a
+# conformant repo from a broken one, so warn and skip rather than file a gap
+# the owner cannot act on — the estate audit runs with GH_TOKEN set
+# (.github/workflows/conformity.yml) and does exercise these.
+if ! GH_SKIP_REASON=$(gh_ready); then
+  echo -e "  review-gate: ${WARN} (${GH_SKIP_REASON}: cannot audit $REPO)"
+  exit 0
+fi
+require_jq
 
 REVIEWER_LOGIN="${REVIEWER_LOGIN:-lennons301-reviewer}"
 ISSUES=()
@@ -69,7 +81,9 @@ else
     else
       APPROVALS=$(echo "$PROTECTION" | jq -r '.required_pull_request_reviews.required_approving_review_count // 0')
       DISMISS=$(echo "$PROTECTION" | jq -r '.required_pull_request_reviews.dismiss_stale_reviews // false')
-      if [ "$APPROVALS" -lt 1 ] 2>/dev/null; then
+      # Anything not a plain count (absent, null, unexpected shape) is a gap:
+      # an unreadable rule is not evidence that the rule is in place.
+      if ! [[ "$APPROVALS" =~ ^[0-9]+$ ]] || [ "$APPROVALS" -lt 1 ]; then
         ISSUES+=("branch protection does not require an approving review")
       fi
       if [ "$DISMISS" != "true" ]; then

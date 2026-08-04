@@ -17,11 +17,12 @@ CHECK="../check-review-gate.sh"
 #   FAKE_GH_COLLAB_LOGIN     login that IS a collaborator (unset -> none is)
 #   FAKE_GH_PROTECTION       body for the branch protection endpoint (unset -> 404)
 #   FAKE_GH_LABEL            "yes" if human-signoff label exists
+#   FAKE_GH_UNAUTH           "yes" to make `gh auth status` fail
 mkdir -p "$TMPDIR/bin"
 cat > "$TMPDIR/bin/gh" <<'MOCK'
 #!/usr/bin/env bash
 case "$1" in
-  auth) exit 0 ;;
+  auth) [ "${FAKE_GH_UNAUTH:-}" = "yes" ] && exit 1 || exit 0 ;;
   api)
     path="$2"
     case "$path" in
@@ -56,7 +57,8 @@ MOCK
 chmod +x "$TMPDIR/bin/gh"
 export PATH="$TMPDIR/bin:$PATH"
 
-# A product YAML on the given workflow, repo, and optional divergence.
+# A product YAML on the given workflow, repo, and optional divergence (the 4th
+# arg is the divergence's `standard:` name; empty means no divergence).
 # workflow/repo have no defaults: an empty string means "key present but
 # blank" (as opposed to omitting the key), and callers must be explicit.
 make_product() {
@@ -69,7 +71,7 @@ make_product() {
     echo "  ai_workflow: $workflow"
     if [ -n "$divergence" ]; then
       echo "divergences:"
-      echo "  - standard: review-gate"
+      echo "  - standard: $divergence"
       echo "    choice: none"
       echo "    reason: solo hobby project, no reviewer needed"
     else
@@ -88,7 +90,8 @@ onboard_gh_env() {
 }
 
 reset_gh_env() {
-  unset FAKE_GH_REPO FAKE_GH_REPO_JSON FAKE_GH_COLLAB_LOGIN FAKE_GH_PROTECTION FAKE_GH_LABEL REVIEWER_LOGIN
+  unset FAKE_GH_REPO FAKE_GH_REPO_JSON FAKE_GH_COLLAB_LOGIN FAKE_GH_PROTECTION \
+    FAKE_GH_LABEL FAKE_GH_UNAUTH REVIEWER_LOGIN
 }
 
 run_check() {
@@ -115,11 +118,21 @@ assert_eq "no ai_workflow is skipped" "0" "$STATUS"
 
 # --- documented divergence -----------------------------------------------------
 reset_gh_env
-make_product "$TMPDIR/diverged.yaml" "ticket-loop" "example/fixture" "yes"
+make_product "$TMPDIR/diverged.yaml" "ticket-loop" "example/fixture" "review-gate"
 run_check "$REPO_DIR" "$TMPDIR/diverged.yaml"
 assert_eq "documented divergence passes without calling gh" "0" "$STATUS"
 assert_eq "divergence renders as ✓*" "yes" \
   "$(echo "$OUTPUT" | grep -q "✓\*" && echo yes || echo no)"
+
+# The standard's filename is the other plausible spelling; both count.
+make_product "$TMPDIR/diverged2.yaml" "ticket-loop" "example/fixture" "review-gates"
+run_check "$REPO_DIR" "$TMPDIR/diverged2.yaml"
+assert_eq "divergence written as review-gates also counts" "0" "$STATUS"
+
+# An unrelated divergence must not excuse the reviewer setup.
+make_product "$TMPDIR/diverged3.yaml" "ticket-loop" "example/fixture" "secrets"
+run_check "$REPO_DIR" "$TMPDIR/diverged3.yaml"
+assert_eq "unrelated divergence does not skip the check" "1" "$STATUS"
 
 # --- ticket-loop, no repo configured -------------------------------------------
 reset_gh_env
@@ -173,6 +186,14 @@ assert_eq "zero required approvals fails" "1" "$STATUS"
 assert_eq "names the gap" "yes" \
   "$(echo "$OUTPUT" | grep -q "does not require an approving review" && echo yes || echo no)"
 
+# --- protection JSON without a readable approval count -------------------------
+onboard_gh_env
+export FAKE_GH_PROTECTION='{"required_pull_request_reviews":{"dismiss_stale_reviews":true}}'
+run_check "$REPO_DIR" "$TMPDIR/ok.yaml"
+assert_eq "unreadable approval count fails" "1" "$STATUS"
+assert_eq "names the gap" "yes" \
+  "$(echo "$OUTPUT" | grep -q "does not require an approving review" && echo yes || echo no)"
+
 # --- branch protection without dismiss_stale_reviews ---------------------------
 onboard_gh_env
 export FAKE_GH_PROTECTION='{"required_pull_request_reviews":{"required_approving_review_count":1,"dismiss_stale_reviews":false}}'
@@ -204,6 +225,22 @@ run_check "$BARE_REPO" "$TMPDIR/ok.yaml"
 assert_eq "missing gate-extension file fails" "1" "$STATUS"
 assert_eq "names the gap" "yes" \
   "$(echo "$OUTPUT" | grep -q "docs/agents/review-gates.yaml missing" && echo yes || echo no)"
+
+# --- gh unavailable -> warn, never a gap ----------------------------------------
+# No token means this machine cannot distinguish a conformant repo from a
+# broken one; a gap here would be unactionable noise.
+onboard_gh_env
+export FAKE_GH_UNAUTH="yes"
+run_check "$REPO_DIR" "$TMPDIR/ok.yaml"
+assert_eq "unauthenticated gh does not count as a gap" "0" "$STATUS"
+assert_eq "warn output names the reason and the repo" \
+  "  review-gate: ~ (gh CLI not authenticated: cannot audit example/fixture)" "$OUTPUT"
+assert_eq "warn output parses as a warn dimension" "review-gate	warn" \
+  "$(source ../lib.sh; echo "$OUTPUT" | parse_check_output | cut -f1,2)"
+unset FAKE_GH_UNAUTH
+
+assert_eq "gh_ready reports an uninstalled gh" "$(printf 'gh CLI not installed\nexit=1')" \
+  "$(source ../lib.sh; PATH=""; gh_ready; echo "exit=$?")"
 
 # --- output matches the parsed line contract ------------------------------------
 onboard_gh_env
