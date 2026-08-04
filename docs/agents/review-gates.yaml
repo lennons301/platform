@@ -1,0 +1,8 @@
+# Repo-specific human-sign-off gates — ADDITIVE extension of the estate
+# default (~/code/platform/standards/review-gates.yaml). A repo can add
+# gates, never remove estate ones. Same shape:
+#
+# human_signoff:
+#   <category>:
+#     - "<glob>"
+human_signoff: {}
