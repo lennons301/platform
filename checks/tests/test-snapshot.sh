@@ -15,7 +15,7 @@ assert_eq "one product checked" "1" "$(jq '.total_products_checked' "$SNAPSHOT")
 assert_eq "product name" "testproj" "$(jq -r '.products[0].name' "$SNAPSHOT")"
 assert_eq "product repo" "example/testproj" "$(jq -r '.products[0].repo' "$SNAPSHOT")"
 assert_eq "product checked" "true" "$(jq '.products[0].checked' "$SNAPSHOT")"
-assert_eq "11 dimensions recorded" "11" "$(jq '.products[0].dimensions | length' "$SNAPSHOT")"
+assert_eq "12 dimensions recorded" "12" "$(jq '.products[0].dimensions | length' "$SNAPSHOT")"
 assert_eq "documentation dimension fails" "fail" \
   "$(jq -r '.products[0].dimensions[] | select(.dimension == "documentation") | .status' "$SNAPSHOT")"
 assert_eq "gap_count equals failed-dimension count" \

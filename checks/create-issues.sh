@@ -41,6 +41,7 @@ standard_doc() {
   case "$1" in
     versions) echo "versions/manifest.yaml" ;;
     architecture) echo "standards/architecture-diagrams.md" ;;
+    review-gate) echo "standards/review-gates.md" ;;
     *) echo "standards/$1.md" ;;
   esac
 }
