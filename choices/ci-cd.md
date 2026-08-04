@@ -101,7 +101,7 @@ jobs:
     permissions:
       contents: read
       issues: write
-    uses: lennons301/platform/.github/workflows/milestone-autoclose.yml@main
+    uses: lennons301/platform/.github/workflows/milestone-autoclose.yml@master
 ```
 
 Behaviour: when an issue closes, its milestone is closed **only** if no open
