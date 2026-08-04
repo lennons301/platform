@@ -18,18 +18,31 @@ CHECK="../check-review-gate.sh"
 #   FAKE_GH_PROTECTION       body for the branch protection endpoint (unset -> 404)
 #   FAKE_GH_LABEL            "yes" if human-signoff label exists
 #   FAKE_GH_UNAUTH           "yes" to make `gh auth status` fail
+#   FAKE_GH_403_COLLAB       "yes" -> 403 on the collaborator lookup
+#   FAKE_GH_403_REPO         "yes" -> 403 on the bare repo lookup
+#   FAKE_GH_403_PROTECTION   "yes" -> 403 on the branch protection endpoint
 mkdir -p "$TMPDIR/bin"
 cat > "$TMPDIR/bin/gh" <<'MOCK'
 #!/usr/bin/env bash
+# A 403 as real gh renders it: response body on stdout, gh's own summary line
+# (the only place the status code appears) on stderr, exit 1 — the same exit
+# code as a 404, which is exactly why the body has to be classified.
+deny() {
+  echo "{\"message\":\"$1\"}"
+  echo "gh: $1 (HTTP 403)" >&2
+  exit 1
+}
 case "$1" in
   auth) [ "${FAKE_GH_UNAUTH:-}" = "yes" ] && exit 1 || exit 0 ;;
   api)
     path="$2"
     case "$path" in
       */collaborators/*)
+        [ "${FAKE_GH_403_COLLAB:-}" = "yes" ] && deny "Must have push access to view collaborators."
         [ "$path" = "repos/$FAKE_GH_REPO/collaborators/$FAKE_GH_COLLAB_LOGIN" ] && exit 0 || exit 1
         ;;
       */branches/*/protection)
+        [ "${FAKE_GH_403_PROTECTION:-}" = "yes" ] && deny "Must have admin rights to Repository."
         if [ -z "${FAKE_GH_PROTECTION:-}" ]; then
           # Real gh prints the error body to stdout even on 404 — mimic that
           # so the check under test can't accidentally treat it as success.
@@ -42,6 +55,7 @@ case "$1" in
         [ "${FAKE_GH_LABEL:-}" = "yes" ] && exit 0 || exit 1
         ;;
       repos/*)
+        [ "${FAKE_GH_403_REPO:-}" = "yes" ] && deny "Resource not accessible by integration"
         if [ -z "${FAKE_GH_REPO_JSON:-}" ]; then
           echo '{"message":"Not Found"}'
           exit 1
@@ -80,8 +94,9 @@ make_product() {
   } > "$path"
 }
 
-# A fully onboarded repo's gh responses.
+# A fully onboarded repo's gh responses, as seen by a fully privileged token.
 onboard_gh_env() {
+  unset FAKE_GH_403_COLLAB FAKE_GH_403_REPO FAKE_GH_403_PROTECTION
   export FAKE_GH_REPO="example/fixture"
   export FAKE_GH_REPO_JSON='{"default_branch":"main","allow_auto_merge":true}'
   export FAKE_GH_COLLAB_LOGIN="lennons301-reviewer"
@@ -91,7 +106,8 @@ onboard_gh_env() {
 
 reset_gh_env() {
   unset FAKE_GH_REPO FAKE_GH_REPO_JSON FAKE_GH_COLLAB_LOGIN FAKE_GH_PROTECTION \
-    FAKE_GH_LABEL FAKE_GH_UNAUTH REVIEWER_LOGIN
+    FAKE_GH_LABEL FAKE_GH_UNAUTH REVIEWER_LOGIN \
+    FAKE_GH_403_COLLAB FAKE_GH_403_REPO FAKE_GH_403_PROTECTION
 }
 
 run_check() {
@@ -225,6 +241,74 @@ run_check "$BARE_REPO" "$TMPDIR/ok.yaml"
 assert_eq "missing gate-extension file fails" "1" "$STATUS"
 assert_eq "names the gap" "yes" \
   "$(echo "$OUTPUT" | grep -q "docs/agents/review-gates.yaml missing" && echo yes || echo no)"
+
+# --- 403 is not a gap -----------------------------------------------------------
+# Branch protection needs admin (administration:read) and the collaborator
+# lookup needs push access; both return 403 — with the same exit code as a 404 —
+# to a token that has neither. "The API would not tell me" must never be
+# recorded as "the repo is misconfigured", or a correctly onboarded repo gets an
+# issue filed against it.
+onboard_gh_env
+export FAKE_GH_403_PROTECTION="yes"
+run_check "$REPO_DIR" "$TMPDIR/ok.yaml"
+assert_eq "403 on branch protection is not a gap" "0" "$STATUS"
+assert_eq "403 warns instead of failing" "yes" \
+  "$(echo "$OUTPUT" | grep -q "~ (cannot fully audit example/fixture" && echo yes || echo no)"
+assert_eq "403 names the missing privilege" "yes" \
+  "$(echo "$OUTPUT" | grep -q "branch protection on main (token lacks admin)" && echo yes || echo no)"
+assert_eq "403 never claims protection is absent" "0" \
+  "$(echo "$OUTPUT" | grep -c "no branch protection")"
+assert_eq "403 parses as a warn dimension" "review-gate	warn" \
+  "$(source ../lib.sh; echo "$OUTPUT" | parse_check_output | cut -f1,2)"
+
+onboard_gh_env
+export FAKE_GH_403_COLLAB="yes"
+run_check "$REPO_DIR" "$TMPDIR/ok.yaml"
+assert_eq "403 on the collaborator lookup is not a gap" "0" "$STATUS"
+assert_eq "collaborator 403 names the missing privilege" "yes" \
+  "$(echo "$OUTPUT" | grep -q "collaborators (token lacks push access)" && echo yes || echo no)"
+assert_eq "403 never claims the reviewer is missing" "0" \
+  "$(echo "$OUTPUT" | grep -c "is not a collaborator")"
+
+onboard_gh_env
+export FAKE_GH_403_REPO="yes"
+run_check "$REPO_DIR" "$TMPDIR/ok.yaml"
+assert_eq "403 on the repo lookup is not a gap" "0" "$STATUS"
+assert_eq "repo 403 covers both dimensions it gates" "yes" \
+  "$(echo "$OUTPUT" | grep -q "repo settings and branch protection (token lacks admin)" && echo yes || echo no)"
+assert_eq "repo 403 is not reported as a fetch failure" "0" \
+  "$(echo "$OUTPUT" | grep -c "could not fetch repo")"
+
+# A repo payload served to an under-privileged token simply omits
+# allow_auto_merge — absent is unverified, not disabled.
+onboard_gh_env
+export FAKE_GH_REPO_JSON='{"default_branch":"main"}'
+run_check "$REPO_DIR" "$TMPDIR/ok.yaml"
+assert_eq "invisible allow_auto_merge is not a gap" "0" "$STATUS"
+assert_eq "invisible allow_auto_merge is reported as unverified" "yes" \
+  "$(echo "$OUTPUT" | grep -q "allow_auto_merge (absent from the repo payload" && echo yes || echo no)"
+assert_eq "invisible allow_auto_merge is never called disabled" "0" \
+  "$(echo "$OUTPUT" | grep -c "allow_auto_merge is not enabled")"
+
+# An explicit false is still a gap — the unverified path must not swallow it.
+onboard_gh_env
+export FAKE_GH_REPO_JSON='{"default_branch":"main","allow_auto_merge":false}'
+run_check "$REPO_DIR" "$TMPDIR/ok.yaml"
+assert_eq "explicit allow_auto_merge=false still fails" "1" "$STATUS"
+
+# A confirmed gap outranks an unverifiable dimension, and both are reported: the
+# fail must not read as a complete audit.
+onboard_gh_env
+export FAKE_GH_403_PROTECTION="yes"
+unset FAKE_GH_LABEL
+run_check "$REPO_DIR" "$TMPDIR/ok.yaml"
+assert_eq "a real gap alongside a 403 still fails" "1" "$STATUS"
+assert_eq "the real gap is named" "yes" \
+  "$(echo "$OUTPUT" | grep -q "human-signoff label missing" && echo yes || echo no)"
+assert_eq "the unverified dimension is named too" "yes" \
+  "$(echo "$OUTPUT" | grep -q "unverified: branch protection on main" && echo yes || echo no)"
+assert_eq "fail-with-unverified is one parseable line" "review-gate	fail" \
+  "$(source ../lib.sh; echo "$OUTPUT" | parse_check_output | cut -f1,2)"
 
 # --- gh unavailable -> warn, never a gap ----------------------------------------
 # No token means this machine cannot distinguish a conformant repo from a
