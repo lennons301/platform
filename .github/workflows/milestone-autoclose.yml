@@ -1,0 +1,68 @@
+# Estate-wide reusable workflow: close a milestone when its last issue closes.
+# Product repos opt in with the caller in templates/milestone-autoclose.yml.tmpl
+# (see "Milestone auto-close" in choices/ci-cd.md).
+name: Milestone Auto-Close
+
+on:
+  workflow_call:
+    inputs:
+      comment-on-issue:
+        description: Comment on the closing issue when the milestone is auto-closed.
+        type: boolean
+        default: false
+        required: false
+      platform-ref:
+        description: >-
+          Ref of lennons301/platform to run the implementation script from.
+          Defaults to the commit this reusable workflow was resolved to, so the
+          script and the workflow always match.
+        type: string
+        default: ''
+        required: false
+    secrets:
+      gh_token:
+        description: >-
+          Token for the milestone API calls. Defaults to the caller's
+          GITHUB_TOKEN, which is sufficient for milestones in the caller's own
+          repo; supply a PAT only for cross-repo use.
+        required: false
+      platform_token:
+        description: >-
+          Token used to check out lennons301/platform for the implementation
+          script. Only needed while that repo is private to the caller.
+        required: false
+
+permissions:
+  issues: write
+
+jobs:
+  autoclose:
+    # Only meaningful for a closed issue that belongs to a milestone.
+    if: >-
+      github.event_name == 'issues' &&
+      github.event.action == 'closed' &&
+      github.event.issue.milestone != null
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the platform implementation script
+        uses: actions/checkout@v4
+        with:
+          repository: lennons301/platform
+          ref: ${{ inputs.platform-ref || github.job_workflow_sha }}
+          token: ${{ secrets.platform_token || github.token }}
+          path: .platform
+          persist-credentials: false
+
+      - name: Close the milestone if its last issue just closed
+        env:
+          GH_TOKEN: ${{ secrets.gh_token || github.token }}
+          REPO: ${{ github.repository }}
+          MILESTONE: ${{ github.event.issue.milestone.number }}
+          ISSUE: ${{ github.event.issue.number }}
+          COMMENT: ${{ inputs.comment-on-issue }}
+        run: |
+          args=(--repo "$REPO" --milestone "$MILESTONE")
+          if [ "$COMMENT" = "true" ]; then
+            args+=(--comment-issue "$ISSUE")
+          fi
+          .platform/scripts/milestone-autoclose.sh "${args[@]}"

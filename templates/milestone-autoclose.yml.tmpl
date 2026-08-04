@@ -1,0 +1,20 @@
+# Milestone auto-close (opt-in)
+# Copy to .github/workflows/milestone-autoclose.yml in your project repo.
+# Closes a milestone as soon as its last open issue closes; no-op otherwise.
+name: Milestone Auto-Close
+
+on:
+  issues:
+    types: [closed]
+
+jobs:
+  autoclose:
+    # The called workflow's token can only be as broad as the caller's, so the
+    # caller has to grant issues: write itself.
+    permissions:
+      issues: write
+    uses: lennons301/platform/.github/workflows/milestone-autoclose.yml@main
+    # with:
+    #   comment-on-issue: true   # leave a note on the issue that emptied it
+    # secrets:
+    #   platform_token: ${{ secrets.PLATFORM_REPO_TOKEN }}   # only if platform is private to this repo
