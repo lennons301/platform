@@ -33,7 +33,8 @@ on:
         required: false
 
 permissions:
-  issues: write
+  contents: read   # checking the platform script out
+  issues: write    # milestones live under the issues scope
 
 jobs:
   autoclose:

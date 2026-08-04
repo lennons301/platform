@@ -99,6 +99,7 @@ on:
 jobs:
   autoclose:
     permissions:
+      contents: read
       issues: write
     uses: lennons301/platform/.github/workflows/milestone-autoclose.yml@main
 ```
@@ -108,10 +109,13 @@ issues remain on it (open PRs assigned to the milestone count as open work).
 It is a no-op otherwise and idempotent on an already-closed milestone, so
 reopening and re-closing issues is safe.
 
-- **Permissions** — the caller's `GITHUB_TOKEN` with `issues: write` is enough;
-  milestones live under the issues scope. A called workflow's token can only be
-  as narrow as the caller's, so the `permissions:` block above is required, not
-  decorative. Only cross-repo milestones need a PAT (`gh_token` secret).
+- **Permissions** — the caller's `GITHUB_TOKEN` is enough: `issues: write` for
+  the milestone (milestones live under the issues scope) and `contents: read`
+  for the step that checks the platform script out. A called workflow's token
+  can only be as narrow as the caller's, and naming any scope in a
+  `permissions:` block drops every scope you leave out to `none` — so both
+  lines above are required, not decorative. Only cross-repo milestones need a
+  PAT (`gh_token` secret).
 - **Opt out per milestone** — put `[no-autoclose]` anywhere in a milestone's
   description to keep a rolling milestone open.
 - **Optional comment** — pass `with: {comment-on-issue: true}` to have the
