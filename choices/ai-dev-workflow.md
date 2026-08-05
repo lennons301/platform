@@ -12,84 +12,55 @@ GitHub Issues:
    break it into tickets. The output is *published* to the repo's issue
    tracker. If it isn't in the tracker, it doesn't exist.
 2. **Work execution** — humans or agents pick up tickets and work them
-   independently. There is no orchestrator; the tracker is the coordinator.
+   independently, each in its own fresh Claude instance and worktree. The
+   tracker coordinates; a chain of dependent tickets can be sequenced and
+   driven, but never by collapsing tickets into one shared context or into
+   subagents (see *Execution: independent per-ticket loops*).
 
 The published tickets are the interface: any tool can generate them, any agent
 or human can execute them, and either side can be swapped without breaking the
 other.
 
-## Tooling
+## Repo documents vs tracker state
 
-### Generation: mattpocock-skills plugin (installed at user scope)
+Durable knowledge lives in the repo; work state lives in the tracker.
 
-These are all `disable-model-invocation: true` — you drive them by slash
-command; an agent never picks them up on its own.
+**Repo (versioned, read every session):** `ROADMAP.md` (coarse, priority-ordered
+milestones), `CONTEXT.md` (domain model, terminology, invariants), `docs/adr/`
+(decision records — the *why*, written during grilling sessions).
 
-| Skill | Use |
-|---|---|
-| `/grill-me` | Interview until the design decisions are actually resolved |
-| `/grill-with-docs` | Same, but updates `CONTEXT.md` and ADRs as decisions crystallise |
-| `/to-spec` | Work was already discussed — skip the interview, write up what was agreed |
-| `/to-tickets` | Break a spec/plan/conversation into thin vertical-slice issues, dependency-ordered |
-| `/triage` | Move issues through the label lifecycle |
-| `/wayfinder` | Charts a large fuzzy initiative as a map issue of **decision** tickets — see below |
-| `/improve-codebase-architecture` | Scan for shallow modules, get an HTML report of deepening candidates, grill through one |
+**Tracker (transient work state):** milestones group the issues for one roadmap
+item (grill → spec → tickets → execute → review → close → next); a `wayfinder:map`
+issue indexes a large fuzzy initiative while it is being charted, and closes once
+its destination is realised (see *Object lifecycle*). No tracker object outlives
+the durable artefact that supersedes it.
 
-Small tasks skip all of this — go straight to execution.
+## Object lifecycle
 
-**`/wayfinder` is planning, not building.** Its tickets resolve *decisions* —
-they are not slices of a build. Each carries a `wayfinder:<type>` label
-(`research` / `prototype` / `grilling` / `task`) on a second axis from the
-triage roles, and most are HITL by construction: a `wayfinder:grilling` ticket
-only resolves through live exchange with a human. It sits **upstream** of
-`/to-spec` and `/to-tickets` and replaces neither — wayfinder until the way is
-clear, then spec, then tickets, then the loop.
+**No artefact outlives its successor.** Each generation phase publishes a tracker
+object, and each is closed once the downstream object that supersedes it exists —
+so the tracker never shows superseded work as live, startable, or countable.
+Durable knowledge is never lost to a close: it has already moved to its successor.
 
-`ticket-loop.sh` therefore refuses `wayfinder:*` tickets outright: the auto-pick
-filters them, and an explicit `--issue` naming one is an error. An agent sent to
-"implement" a grilling ticket would answer its own question and open a PR for
-it.
+| Object | Closes when | Its record lives on as |
+|---|---|---|
+| `wayfinder:*` child ticket | on resolution | a *Decisions-so-far* pointer on the map (+ an ADR if it settled a design decision) |
+| `wayfinder:map` | its destination is realised — the spec+tickets exist, the decision is locked as an ADR, or the in-place change is made; a redrawn destination is a **fresh map**, not a reopening | the spec/tickets it produced, plus ADRs |
+| Spec issue (`/to-spec`) | `/to-tickets` decomposes it — closed with a comment linking the tickets it produced | the build tickets and their milestone |
+| Build ticket (`/to-tickets`) | its PR merges | merged code |
+| Milestone | it reaches `0 open` (milestone-autoclose) | — |
 
-### Execution: the same plugin's model-invocable skills
+The per-object *operational* specifics — how to close the spec issue, the `n+1`
+milestone-count trap, the frontier query — live in *After /to-tickets*.
 
-Everything above is human-driven. These carry no `disable-model-invocation`, so
-an agent inside the loop reaches them on its own — no wiring needed, and they
-are the menu that ticket labels select from (see *Workflows per ticket*).
-
-| Skill | Where it lands |
-|---|---|
-| `/tdd` | Red→green loop. **Needs its seams pre-agreed** — see below |
-| `/diagnosing-bugs` | Diagnosis loop; replaces `superpowers:systematic-debugging` |
-| `/code-review` | Two-axis (Standards + Spec) self-check the implement pass runs before pushing |
-| `/resolving-merge-conflicts` | When the default branch has moved under a PR |
-| `/research` | Background agent against primary sources |
-| `/prototype` | **HITL only** — the user runs it and reacts. Never on a `ready-for-agent` ticket |
-| `/codebase-design` | Deep-module vocabulary: module, interface, depth, seam, adapter, leverage, locality |
-| `/domain-modeling` | Owns the `CONTEXT.md` and `docs/adr/` formats this doc mandates |
-
-**Seams must arrive in the ticket.** `/tdd`'s core rule is that no test is
-written at an unconfirmed seam — "confirm them with the user". An unattended
-pass has no user to confirm with, so it either invents seams (defeating the
-discipline) or stalls. `/to-tickets` output for anything labelled `workflow:tdd`
-must therefore name the seams under test in the issue body. A ticket that
-doesn't is not ready for an agent.
-
-**`/implement` is deliberately not adopted.** It is the plugin's alternative
-*orchestrator* — `ticket-loop.sh` is ours — and being
-`disable-model-invocation: true` it is unreachable from the runner anyway.
-
-**Per-repo setup:** run `/setup-matt-pocock-skills` once in each repo before
-first use. It configures the issue tracker (GitHub), the triage label
-vocabulary, and where `CONTEXT.md`/ADRs live (writes `docs/agents/`).
-
-### Labels (canonical roles)
+## Labels (canonical roles)
 
 `needs-triage` → `needs-info` | `ready-for-agent` | `ready-for-human` | `wontfix`
 
 - `ready-for-agent` (AFK) — an agent can implement and merge unattended
 - `ready-for-human` (HITL) — needs a human decision or human implementation
 
-### Who may arm a ticket
+## Who may arm a ticket
 
 Applying `ready-for-agent` is the launch button: it authorises unattended code
 to land. The rule is about **provenance, not about who types the command**.
@@ -121,7 +92,170 @@ the only thing between an outside contributor and a merge.
 Whether to arm a whole generated batch at once is a *pacing* decision, separate
 from all of the above, and belongs to the owner batch by batch.
 
-### Execution: one agent per ticket, no orchestrator
+## The generation flow
+
+Ticket generation isn't a single pipeline — it's a decision tree keyed on **how
+big and how foggy** the work is. Pick the entry point that fits; the lanes all
+rejoin at the loop.
+
+1. **Tiny / clear** — skip generation entirely. Open one `ready-for-agent`
+   ticket, or just do the work.
+2. **Already-discussed feature** — `/to-tickets` straight from the conversation.
+   Add `/to-spec` first only when the feature is big enough to want a durable,
+   reviewable PRD before it's sliced.
+3. **Feature needing design** — `/grill-me` (or `/grill-with-docs`, which also
+   writes `CONTEXT.md`/ADRs as decisions crystallise) → `/to-spec` and/or
+   `/to-tickets` → the loop.
+4. **Large, foggy initiative** — too big for one session and the way to the
+   destination isn't visible yet. `/wayfinder` first (below), until the way is
+   clear, then rejoin lane 2 or 3.
+
+The generation skills are all `disable-model-invocation: true` — you drive them
+by slash command; an agent never picks one up on its own.
+
+| Skill | Use |
+|---|---|
+| `/grill-me` | Interview until the design decisions are actually resolved |
+| `/grill-with-docs` | Same, but updates `CONTEXT.md` and ADRs as decisions crystallise |
+| `/to-spec` | Work was already discussed — skip the interview, write up what was agreed |
+| `/to-tickets` | Break a spec/plan/conversation into thin vertical-slice issues, dependency-ordered |
+| `/triage` | Move issues through the label lifecycle |
+| `/wayfinder` | Charts a large fuzzy initiative as a map of **decision** tickets — see below |
+| `/improve-codebase-architecture` | Scan for shallow modules, get an HTML report of deepening candidates, grill through one |
+
+### Wayfinder (lane 4)
+
+`/wayfinder` charts a large fuzzy initiative as a `wayfinder:map` issue that
+indexes **decision-ticket** children, each labelled `wayfinder:<type>`
+(`research` / `prototype` / `grilling` / `task`), then resolves them one per
+session until the way to the **destination** is clear. The map body, fog-of-war,
+and frontier mechanics live in the skill — this section is only how wayfinder
+meets the rest of the estate.
+
+**Wayfinder plans, it doesn't build.** Every ticket resolves a *decision*, not a
+slice of the build — including the `task` type, the one that *does* rather than
+decides: it performs prerequisite work (provisioning access, moving data so its
+shape can be seen) whose output is *facts a later decision waits on*, never a
+piece of the destination. If a ticket's output would be a piece of the product,
+it was mis-typed and belongs in the build lane.
+
+**Two different "AFK" axes — don't conflate them.** Wayfinder tickets carry their
+own AFK/HITL distinction — can the *wayfinding agent* resolve this one alone in
+its session? (`research` is AFK, `grilling` is HITL, `task` is either.) That is a
+different axis from the estate's `ready-for-agent` launch button — can
+*ticket-loop* land a PR unattended? Different ticket-spaces, different units of
+work: a fact recorded on the map versus a mergeable PR.
+
+**Strict separation.** No `wayfinder:*` ticket ever carries `ready-for-agent` or
+reaches the execution loop. A wayfinder ticket is claimed by **assignment**
+(`gh issue edit <n> --add-assignee @me`), never by the triage label; `/to-spec`
+and `/to-tickets` are what stamp `ready-for-agent`, downstream in the build lane.
+`ticket-loop.sh` is defensive about it regardless: the auto-pick excludes
+`wayfinder:*` and an explicit `--issue` naming one is a hard error — "they must
+never reach this loop, however they got labelled `ready-for-agent`." An agent
+sent to *implement* a `wayfinder:grilling` ticket would answer its own question
+and open a PR for it.
+
+**One exit.** The map has exactly one exit — its **destination** (a spec to hand
+to lane 2/3, a decision locked as an ADR, or an in-place change). Individual
+tickets, `task` included, are internal steps toward it, never exits in their own
+right. When the destination is realised, the map closes (see *Object lifecycle*).
+
+## Execution skills
+
+The generation skills above are human-driven. These carry no
+`disable-model-invocation`, so an agent inside the loop reaches them on its own —
+no wiring needed, and they are the menu that ticket labels select from (see
+*Workflows per ticket*).
+
+| Skill | Where it lands |
+|---|---|
+| `/tdd` | Red→green loop. **Needs its seams pre-agreed** — see below |
+| `/diagnosing-bugs` | Diagnosis loop; replaces `superpowers:systematic-debugging` |
+| `/code-review` | Two-axis (Standards + Spec) self-check the implement pass runs before pushing |
+| `/resolving-merge-conflicts` | When the default branch has moved under a PR |
+| `/research` | Background agent against primary sources |
+| `/prototype` | **HITL only** — the user runs it and reacts. Never on a `ready-for-agent` ticket |
+| `/codebase-design` | Deep-module vocabulary: module, interface, depth, seam, adapter, leverage, locality |
+| `/domain-modeling` | Owns the `CONTEXT.md` and `docs/adr/` formats this doc mandates |
+
+**Seams must arrive in the ticket.** `/tdd`'s core rule is that no test is
+written at an unconfirmed seam — "confirm them with the user". An unattended
+pass has no user to confirm with, so it either invents seams (defeating the
+discipline) or stalls. `/to-tickets` output for anything labelled `workflow:tdd`
+must therefore name the seams under test in the issue body. A ticket that
+doesn't is not ready for an agent.
+
+**`/implement` is deliberately not adopted.** It is the plugin's alternative
+*orchestrator* — `ticket-loop.sh` is ours — and being
+`disable-model-invocation: true` it is unreachable from the runner anyway.
+
+**Per-repo setup:** run `/setup-matt-pocock-skills` once in each repo before
+first use. It configures the issue tracker (GitHub), the triage label
+vocabulary, and where `CONTEXT.md`/ADRs live (writes `docs/agents/`).
+
+## Workflows per ticket
+
+1. **The menu** — the model-invocable skills above *are* the menu. A
+   `workflow:<skill>` label on the ticket selects one, and the label name is
+   the skill name, so there are no menu files to write or keep current:
+
+   | Label | Runs |
+   |---|---|
+   | `workflow:tdd` | `/tdd` — must name its seams in the body |
+   | `workflow:diagnosing-bugs` | `/diagnosing-bugs` |
+   | `workflow:research` | `/research` |
+   | `workflow:prototype` | `/prototype` — HITL, pair with `ready-for-human` |
+
+   No label means the agent uses its judgement, as before.
+2. **Per-ticket overrides** — if no menu item fits, the ticket author writes a
+   short **Workflow** section into the issue body: steps, gates, done-signal.
+   Agents follow this if present, otherwise the labelled default.
+3. **Promotion rule** — the same bespoke workflow in three tickets gets
+   promoted: prefer an upstream skill where one fits, otherwise add a named
+   workflow to this table via PR.
+
+## After /to-tickets: milestones, frontier, completion
+
+A generation run drops a batch of tickets into a repo that already has other
+issues. Three rules keep the batch legible afterwards — they apply to every
+generation run, not just the first.
+
+**1. The milestone is the phase; the spec issue is not part of it.** Group the
+generated tickets under one milestone named for the roadmap item. `0 open` on
+that milestone is the completion signal, and it only means something if
+everything in it is *work*. So once `/to-tickets` has decomposed a spec issue,
+close the spec issue with a comment linking the tickets it produced — *Object
+lifecycle*: no artefact outlives its successor. (`/to-tickets` deliberately never
+touches a parent issue — it can't tell a one-off spec from a `wayfinder:map`, so
+the close is the human's call.) Leaving it open inside the milestone parks the
+count at `n+1` forever and makes the spec show up as startable work.
+
+**2. Dependency order is data, not memory.** `/to-tickets` records blocking
+edges as native GitHub issue dependencies. GitHub counts only *open* blockers,
+so a ticket is on the frontier exactly when `blocked_by` is 0, and it becomes
+eligible on its own as its blockers close. Nothing needs re-sequencing by hand.
+
+**3. Arm from the frontier.** The frontier query — open, in the milestone, no
+open blockers:
+
+```bash
+for n in $(gh issue list --milestone "<milestone>" --state open \
+             --limit 100 --json number --jq '.[].number' | sort -n); do
+  gh api "repos/{owner}/{repo}/issues/$n" \
+    --jq 'select((.issue_dependencies_summary.blocked_by // 0) == 0)
+          | "#\(.number)  \(.title)"'
+done
+```
+
+`ticket-loop.sh` skips blocked tickets in its auto-pick and refuses a blocked
+`--issue` outright, so the order survives an armed ticket that isn't ready.
+Interlude's autonomous executor applies the same rule as a claim-eligibility
+check (Phase 5). Publishing a generated batch **unlabelled** and arming from
+the frontier keeps `ready-for-agent` doing one honest job: it is both the
+launch button and the sequencer.
+
+## Execution: independent per-ticket loops
 
 - Each ticket is worked by one agent (or human) in its own git worktree and
   branch (`agent/issue-<n>`).
@@ -140,15 +274,24 @@ from all of the above, and belongs to the owner batch by batch.
   extension). No match → auto-merge armed (squash); approval lands it. Match →
   `human-signoff` label, auto-merge off; a human merges after looking. See
   `standards/review-gates.md`.
-- Parallelism = several independent loops in separate worktrees, not an
-  orchestrating agent. Subagents are for narrow fan-out (research, scanning)
-  only.
+- **Parallel or sequenced, it's always independent instances.** Running several
+  unrelated tickets at once and driving a dependent chain in order are the same
+  mechanism: independent loops coordinated by the tracker, not one agent holding
+  them in a shared context. There's more than one way to drive a chain —
+  (a) pure labelling: dependency edges plus `ready-for-agent`, each ticket
+  auto-picked in order as its blockers close; (b) a Claude session running
+  `ticket-loop.sh` across the frontier; (c) a user driving Claude agents;
+  (d) manual command-line invocation. The invariant they share: **each ticket is
+  worked by a separate, fresh Claude instance in its own worktree — never a
+  subagent of the driver.** A subagent would share the driver's context and
+  identity, defeating both the fresh-context read and the fresh-identity review.
+  Subagents stay fine for narrow fan-out *within* a ticket (research, scanning).
 - Thin runner: `scripts/ticket-loop.sh` in this repo picks up one
   `ready-for-agent` issue, runs the implement pass in a worktree, evaluates
   the review gates, then runs the review pass with fresh context under the
   reviewer identity.
 
-### PR-state dispatch & the repair pass
+## PR-state dispatch & the repair pass
 
 Parked PRs go stale underneath the loop: gated (`human-signoff`) PRs wait for
 a human merge, and each human merge can flip the still-parked ones to
@@ -345,48 +488,7 @@ and the preflight's checked set are one definition in the runner — see
 repo. Approve and merge when satisfied; the reviewer's comment-review explains
 what it verified.
 
-## After /to-tickets: milestones, frontier, completion
-
-A generation run drops a batch of tickets into a repo that already has other
-issues. Three rules keep the batch legible afterwards — they apply to every
-generation run, not just the first.
-
-**1. The milestone is the phase; the spec issue is not part of it.** Group the
-generated tickets under one milestone named for the roadmap item. `0 open` on
-that milestone is the completion signal, and it only means something if
-everything in it is *work*. So once `/to-tickets` has decomposed a spec issue,
-close the spec issue with a comment linking the tickets it produced. (`/to-tickets`
-deliberately never touches a parent issue — it can't tell a one-off spec from a
-long-lived `/wayfinder` map, so the close is the human's call.) Leaving it open
-inside the milestone parks the count at n+1 forever and makes the spec show up
-as startable work. Keeping it open as an anchor is fine for a fuzzy initiative —
-then drop it *out* of the milestone.
-
-**2. Dependency order is data, not memory.** `/to-tickets` records blocking
-edges as native GitHub issue dependencies. GitHub counts only *open* blockers,
-so a ticket is on the frontier exactly when `blocked_by` is 0, and it becomes
-eligible on its own as its blockers close. Nothing needs re-sequencing by hand.
-
-**3. Arm from the frontier.** The frontier query — open, in the milestone, no
-open blockers:
-
-```bash
-for n in $(gh issue list --milestone "<milestone>" --state open \
-             --limit 100 --json number --jq '.[].number' | sort -n); do
-  gh api "repos/{owner}/{repo}/issues/$n" \
-    --jq 'select((.issue_dependencies_summary.blocked_by // 0) == 0)
-          | "#\(.number)  \(.title)"'
-done
-```
-
-`ticket-loop.sh` skips blocked tickets in its auto-pick and refuses a blocked
-`--issue` outright, so the order survives an armed ticket that isn't ready.
-Interlude's autonomous executor applies the same rule as a claim-eligibility
-check (Phase 5). Publishing a generated batch **unlabelled** and arming from
-the frontier keeps `ready-for-agent` doing one honest job: it is both the
-launch button and the sequencer.
-
-### Human parity (solo developer)
+## Human parity (solo developer)
 
 This estate has one developer. The reviewer identity exists to **enable
 automation, never to gate the human out**: every outcome the automation can
@@ -409,39 +511,6 @@ enable `enforce_admins` (include administrators) on ticket-loop repos — with
 one human it makes solo merging impossible. `setup-reviewer.sh` preserves it
 where it already exists and warns; either accept reviewer-approval-then-merge
 as your only path there, or turn it off.
-
-## Workflows per ticket
-
-1. **The menu** — the model-invocable skills above *are* the menu. A
-   `workflow:<skill>` label on the ticket selects one, and the label name is
-   the skill name, so there are no menu files to write or keep current:
-
-   | Label | Runs |
-   |---|---|
-   | `workflow:tdd` | `/tdd` — must name its seams in the body |
-   | `workflow:diagnosing-bugs` | `/diagnosing-bugs` |
-   | `workflow:research` | `/research` |
-   | `workflow:prototype` | `/prototype` — HITL, pair with `ready-for-human` |
-
-   No label means the agent uses its judgement, as before.
-2. **Per-ticket overrides** — if no menu item fits, the ticket author writes a
-   short **Workflow** section into the issue body: steps, gates, done-signal.
-   Agents follow this if present, otherwise the labelled default.
-3. **Promotion rule** — the same bespoke workflow in three tickets gets
-   promoted: prefer an upstream skill where one fits, otherwise add a named
-   workflow to this table via PR.
-
-## Repo documents vs tracker state
-
-Durable knowledge lives in the repo; work state lives in the tracker.
-
-**Repo (versioned, read every session):** `ROADMAP.md` (coarse, priority-ordered
-milestones), `CONTEXT.md` (domain model, terminology, invariants), `docs/adr/`
-(decision records — the *why*, written during grilling sessions).
-
-**Tracker:** milestones group the issues for one roadmap item (grill → spec →
-tickets → execute → review → close → next); a parent "map" issue per large
-fuzzy initiative.
 
 ## Cautions
 

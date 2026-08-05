@@ -18,8 +18,9 @@
 # `gh pr merge --auto`, gated PRs are labelled human-signoff and left
 # disarmed. See standards/review-gates.md and choices/ai-dev-workflow.md.
 #
-# Parallelism = run several invocations against different issues; each gets
-# its own worktree and branch. No orchestrator.
+# Parallel or sequenced, execution is always independent instances: run several
+# invocations (different issues, or a dependency chain worked in order), each in
+# its own worktree and branch. A driver may sequence them — never as subagents.
 #
 # Usage:
 #   ./scripts/ticket-loop.sh [--issue N] [--repo-dir PATH] [--afk]
@@ -227,7 +228,7 @@ if gh issue view "$ISSUE" --json labels \
     --jq '[.labels[].name | startswith("wayfinder:")] | any' | grep -q true; then
   echo "==> ERROR: issue #$ISSUE is a wayfinder ticket (wayfinder:* label)." >&2
   echo "    Wayfinder tickets resolve decisions, not code — work it with /wayfinder." >&2
-  echo "    See 'Plan, don't do' in choices/ai-dev-workflow.md." >&2
+  echo "    See 'The generation flow' (Wayfinder) in choices/ai-dev-workflow.md." >&2
   exit 1
 fi
 
