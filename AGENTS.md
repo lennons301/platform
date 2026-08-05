@@ -93,6 +93,12 @@ docs/                — presentations and design specs
   `scripts/ticket-loop.sh` that also feed the permission preflight — changing
   a pass prompt or `templates/agents/ticket-reviewer.md` means updating the
   matching array (see "Capability contracts" in `choices/ai-dev-workflow.md`)
+- A pass's narration is never evidence of its side effects: after the review
+  pass, `scripts/ticket-loop.sh` reads its `VERDICT:` line and requires GitHub
+  to show a matching review by the reviewer identity
+  (`scripts/review-verify-lib.sh`), exiting non-zero on a mismatch or when the
+  review is unverifiable (see "Verified side effects" in
+  `choices/ai-dev-workflow.md`)
 - `scripts/ticket-loop.sh` dispatches on an existing open PR's state before
   working a ticket: `CONFLICTING` runs a repair pass (merge the default
   branch, never rebase/force-push; no attempt consumed), `MERGEABLE`+approved

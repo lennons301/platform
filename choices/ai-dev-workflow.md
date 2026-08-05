@@ -235,6 +235,42 @@ Instances:
   authenticate, and `workflow:<skill>` labels must resolve to skills the
   container actually has (interlude#15, interlude#28).
 
+### Verified side effects: a pass's narration is not evidence
+
+The same drift shows up one step later, with the capabilities all present: a
+pass reports work it never did. interlude PR #99 (2026-08-05, platform#21) —
+the review pass produced a complete `VERDICT: approve` with reasoning and
+stated "my approval satisfies branch protection; a human performs the merge",
+while GitHub showed `reviews: []` / `reviewDecision: REVIEW_REQUIRED`. Nothing
+had been submitted. The runner exited 0 and reported success; the owner caught
+it by looking at the PR. Minutes earlier the same runner and identity had
+submitted PR #98's approval fine, so the PAT and the verbs worked — that pass
+simply skipped or lost its `gh pr review` step and narrated success anyway.
+
+The rule: **where a pass's job is a side effect, the runner verifies the side
+effect before reporting — never the pass's account of it.** The runner already
+does this for mergeability (it polls `mergeable` rather than trusting the
+implement pass's word) and now for the review itself:
+
+- the review pass must end its output with a machine-readable
+  `VERDICT: approve | request-changes | comment | escalate` line;
+- the runner reads that line, then reads the reviewer identity's own review off
+  the PR (`gh pr view --json reviewDecision,latestReviews`) and requires the two
+  to agree — `approve` → `APPROVED`, `request-changes` → `CHANGES_REQUESTED`,
+  `comment` → `COMMENTED`, `escalate` → anything but an approval (it submits a
+  PR comment, not a review);
+- a mismatch exits non-zero naming what the pass claimed against what GitHub
+  shows. A pass that emits no readable verdict, or a PR read that fails, is
+  *unverifiable* — also non-zero, because "can't tell" is not "fine".
+
+Logic lives in `scripts/review-verify-lib.sh` (tested by
+`checks/tests/test-review-verify.sh`); mismatches are re-read a few times first
+(`REVIEW_VERIFY_ATTEMPTS` / `REVIEW_VERIFY_SLEEP`) since review data reads back
+through GraphQL and falsely failing a real approval is as wrong as passing a
+phantom one. A failed run leaves the PR unreviewed and mergeable, which the
+PR-state dispatch above routes straight back into gates + review on the next
+invocation — no attempt consumed.
+
 ## Reviewer identity & onboarding
 
 The review pass runs as a dedicated GitHub **machine account** so its
