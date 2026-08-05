@@ -7,7 +7,8 @@
 #   (see "PR-state dispatch" below: conflicting PRs get a repair pass, parked
 #   approved PRs exit early) -> worktree -> implement pass (claude -p)
 #   -> deterministic review gates (arm auto-merge, or human-signoff)
-#   -> review pass (fresh context, reviewer identity) -> report.
+#   -> review pass (fresh context, reviewer identity) -> verify the review
+#   actually landed on GitHub -> report.
 #
 # The review pass runs as the reviewer machine account (PAT fetched from
 # Doppler), so its approvals are accepted by GitHub. Whether an approval may
@@ -38,6 +39,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 source "$SCRIPT_DIR/review-gates-lib.sh"
+source "$SCRIPT_DIR/review-verify-lib.sh"
 
 # Reviewer identity (override via env if your estate differs)
 REVIEWER_LOGIN="${REVIEWER_LOGIN:-lennons301-reviewer}"
@@ -461,7 +463,8 @@ mapfile -t CHANGED < <(gh pr diff "$PR" --name-only)
 GATES_PLATFORM="$SCRIPT_DIR/../standards/review-gates.yaml"
 GATES_REPO=""
 GATES_REPO_TMP="$(mktemp)"
-trap 'rm -f "$GATES_REPO_TMP"' EXIT
+REVIEW_LOG="$(mktemp)"   # the review pass's own output — see the verification below
+trap 'rm -f "$GATES_REPO_TMP" "$REVIEW_LOG"' EXIT
 git fetch origin "$DEFAULT_BRANCH" --quiet || true
 if git -C "$WORKTREE" show "origin/$DEFAULT_BRANCH:docs/agents/review-gates.yaml" \
     > "$GATES_REPO_TMP" 2>/dev/null; then
@@ -535,12 +538,43 @@ fi
 echo "==> Reviewing PR #$PR as $REVIEWER_ACTUAL"
 # Pre-approve the reviewer's capability contract (REVIEW_VERBS above). Same
 # NB as the implement pass: the prompt must come BEFORE --allowedTools.
+# Output is teed: the verdict line the verification below reads has to survive
+# the pass, and the operator still watches the review live.
 (cd "$WORKTREE" && GH_TOKEN="$REVIEWER_TOKEN" claude -p "
 Launch the ticket-reviewer agent to review PR #$PR (originating issue #$ISSUE),
 then relay its verdict verbatim.
 
 Context for the reviewer: $GATE_NOTE
-" --allowedTools "$(allowed_tools "${REVIEW_VERBS[@]}")")
+
+End your output with the machine-readable verdict on its own final line —
+exactly 'VERDICT: approve', 'VERDICT: request-changes', 'VERDICT: comment'
+(recommend human sign-off), or 'VERDICT: escalate'. The runner reads that line
+and checks GitHub for the matching review before reporting success: a verdict
+you narrate but never submit with gh pr review fails this run.
+" --allowedTools "$(allowed_tools "${REVIEW_VERBS[@]}")") 2>&1 | tee "$REVIEW_LOG"
+
+# --- Review side-effect verification -------------------------------------------
+# The runner is the deterministic guarantor here too: a pass's narration is not
+# evidence that GitHub recorded anything. interlude PR #99 (2026-08-05) produced
+# a complete 'VERDICT: approve' with reasoning and reported "my approval
+# satisfies branch protection" while GitHub showed reviews: [] /
+# reviewDecision: REVIEW_REQUIRED — the pass skipped or lost its
+# `gh pr review` step and narrated success anyway, and the runner exited 0.
+# Same shape as the capability-contract failures (interlude#29 / platform#12):
+# claims drifting from side effects. So: read the claimed verdict, read the
+# reviewer identity's actual review off the PR, and require them to agree —
+# an unverifiable review (no machine-readable verdict, or an API read that
+# failed) is a failure, never a pass.
+set +e
+verify_review_landed "$PR" "$REVIEWER_ACTUAL" "$REVIEW_LOG"
+VERIFY_RC=$?
+set -e
+if [ "$VERIFY_RC" -ne 0 ]; then
+  echo "==> ERROR: the review pass's verdict is not on PR #$PR as reviewed by $REVIEWER_ACTUAL (see above)." >&2
+  echo "    Not reporting success on a review GitHub has no record of. Re-run to review again;" >&2
+  echo "    the PR-state dispatch routes an unreviewed MERGEABLE PR straight back to gates + review." >&2
+  exit 1
+fi
 
 case "$MODE" in
   implement)   echo "==> Done. Issue #$ISSUE, PR #$PR, attempt $ATTEMPT." ;;
