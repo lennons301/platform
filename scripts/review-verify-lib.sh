@@ -18,6 +18,12 @@
 set -uo pipefail
 # NOTE: no set -e — callers branch on exit codes (see below).
 
+# How hard to look before calling a claimed review missing (env-overridable so
+# tests don't sleep): GitHub reads review data back through GraphQL, so a review
+# submitted seconds ago can read stale for a moment.
+REVIEW_VERIFY_ATTEMPTS="${REVIEW_VERIFY_ATTEMPTS:-3}"
+REVIEW_VERIFY_SLEEP="${REVIEW_VERIFY_SLEEP:-3}"
+
 # claimed_review_verdict <log-file>
 #   stdout: the normalised verdict — approve | request-changes | comment | escalate
 #   exit:   0 = found, 1 = no recognisable verdict in the log
@@ -95,33 +101,42 @@ verify_review_landed() {
     return 2
   fi
 
-  local read_out state decision
-  read_out="$(reviewer_review_state "$pr" "$login")" || {
-    echo "ERROR: could not read reviews on PR #$pr (gh pr view --json reviewDecision,latestReviews failed)." >&2
-    echo "       The review pass claimed '$verdict'; that claim stays unverified." >&2
-    return 2
-  }
-  state="${read_out%%$'\t'*}"
-  decision="${read_out#*$'\t'}"
-
   local want
   want="$(expected_review_state "$verdict")"
 
-  # Escalation submits a PR comment rather than a review; the one thing it must
-  # never have done is approve.
-  if [ "$verdict" = "escalate" ]; then
-    if [ "$state" = "APPROVED" ]; then
-      echo "ERROR: the review pass claimed 'escalate' on PR #$pr, but GitHub shows $login APPROVED it." >&2
-      return 1
-    fi
-    echo "Verified: review pass escalated PR #$pr; no approval by $login (review state: ${state:-none}, reviewDecision: ${decision:-none})."
-    return 0
-  fi
+  # A mismatch is retried a couple of times: GitHub's review data is read back
+  # through GraphQL, so a review submitted seconds ago can briefly read stale,
+  # and failing a real approval is as wrong as passing a phantom one. Only the
+  # verdicts that expect a review retry — an escalation that approved anyway
+  # cannot improve with time.
+  local try state="" decision="" read_out
+  for (( try = 1; try <= REVIEW_VERIFY_ATTEMPTS; try++ )); do
+    if read_out="$(reviewer_review_state "$pr" "$login")"; then
+      state="${read_out%%$'\t'*}"
+      decision="${read_out#*$'\t'}"
 
-  if [ "$state" = "$want" ]; then
-    echo "Verified: review pass claimed '$verdict' and GitHub shows $login $state on PR #$pr (reviewDecision: ${decision:-none})."
-    return 0
-  fi
+      # Escalation submits a PR comment rather than a review; the one thing it
+      # must never have done is approve.
+      if [ "$verdict" = "escalate" ]; then
+        if [ "$state" = "APPROVED" ]; then
+          echo "ERROR: the review pass claimed 'escalate' on PR #$pr, but GitHub shows $login APPROVED it." >&2
+          return 1
+        fi
+        echo "Verified: review pass escalated PR #$pr; no approval by $login (review state: ${state:-none}, reviewDecision: ${decision:-none})."
+        return 0
+      fi
+
+      if [ "$state" = "$want" ]; then
+        echo "Verified: review pass claimed '$verdict' and GitHub shows $login $state on PR #$pr (reviewDecision: ${decision:-none})."
+        return 0
+      fi
+    elif [ "$try" -eq "$REVIEW_VERIFY_ATTEMPTS" ]; then
+      echo "ERROR: could not read reviews on PR #$pr (gh pr view --json reviewDecision,latestReviews failed)." >&2
+      echo "       The review pass claimed '$verdict'; that claim stays unverified." >&2
+      return 2
+    fi
+    if [ "$try" -lt "$REVIEW_VERIFY_ATTEMPTS" ]; then sleep "$REVIEW_VERIFY_SLEEP"; fi
+  done
 
   echo "ERROR: review pass claim and GitHub disagree on PR #$pr — the pass's narration is not evidence." >&2
   echo "       pass claimed:  $verdict (expected a $want review by $login)" >&2

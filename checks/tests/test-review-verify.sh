@@ -4,6 +4,8 @@
 # reviewer identity. gh is stubbed; no network.
 cd "$(dirname "$0")" || exit 1
 source ./helpers.sh
+# No sleeping in tests; the retry itself is exercised explicitly below.
+export REVIEW_VERIFY_SLEEP=0
 source ../../scripts/review-verify-lib.sh
 
 TMPDIR=$(mktemp -d)
@@ -11,15 +13,25 @@ trap 'rm -rf "$TMPDIR"' EXIT
 
 # --- fake gh -----------------------------------------------------------------
 # GH_STUB_PR_JSON is the body `gh pr view --json reviewDecision,latestReviews`
-# returns; GH_STUB_FAIL=yes makes the read fail the way a dead token does.
+# returns; GH_STUB_FAIL=yes makes every read fail the way a dead token does.
+# The _FIRST variants answer only the first call, so retry behaviour (a review
+# that reads stale for a moment) is testable. Every call is counted.
 mkdir -p "$TMPDIR/bin"
 cat > "$TMPDIR/bin/gh" <<'MOCK'
 #!/usr/bin/env bash
+N=$(( $(cat "$GH_STUB_COUNT" 2>/dev/null || echo 0) + 1 ))
+echo "$N" > "$GH_STUB_COUNT"
 [ "${GH_STUB_FAIL:-}" = "yes" ] && { echo "gh: could not read PR (HTTP 401)" >&2; exit 1; }
+if [ "$N" = "1" ]; then
+  [ "${GH_STUB_FAIL_FIRST:-}" = "yes" ] && { echo "gh: upstream timeout (HTTP 502)" >&2; exit 1; }
+  [ -n "${GH_STUB_PR_JSON_FIRST:-}" ] && { printf '%s' "$GH_STUB_PR_JSON_FIRST"; exit 0; }
+fi
 printf '%s' "${GH_STUB_PR_JSON:-}"
 MOCK
 chmod +x "$TMPDIR/bin/gh"
 export PATH="$TMPDIR/bin:$PATH"
+export GH_STUB_COUNT="$TMPDIR/gh-calls"
+gh_calls() { cat "$GH_STUB_COUNT" 2>/dev/null || echo 0; }
 
 REVIEWER="lennons301-reviewer"
 
@@ -39,6 +51,7 @@ log() {
 
 # verify <pr-json> <log-path> -> combined output; sets STATUS
 verify() {
+  : > "$GH_STUB_COUNT"
   OUTPUT=$(GH_STUB_PR_JSON="$1" verify_review_landed 99 "$REVIEWER" "$2" 2>&1)
   STATUS=$?
 }
@@ -133,10 +146,40 @@ assert_eq "no machine-readable verdict is unverifiable (exit 2)" "2" "$STATUS"
 assert_eq "says why it could not be verified" "1" \
   "$(echo "$OUTPUT" | grep -c "no machine-readable")"
 
+: > "$GH_STUB_COUNT"
 OUTPUT=$(GH_STUB_FAIL=yes verify_review_landed 99 "$REVIEWER" \
   "$(log 'VERDICT: approve')" 2>&1)
 assert_eq "a failed API read is unverifiable, not a pass (exit 2)" "2" "$?"
 assert_eq "says the claim stays unverified" "1" \
   "$(echo "$OUTPUT" | grep -c "stays unverified")"
+
+# --- retries: a review that reads stale for a moment is not a phantom --------
+
+APPROVED_JSON="$(pr_json APPROVED "$REVIEWER" APPROVED)"
+
+: > "$GH_STUB_COUNT"
+GH_STUB_PR_JSON_FIRST="$NO_REVIEWS" GH_STUB_PR_JSON="$APPROVED_JSON" \
+  verify_review_landed 99 "$REVIEWER" "$(log 'VERDICT: approve')" > /dev/null 2>&1
+assert_eq "an approval that reads stale on the first look still verifies" "0" "$?"
+assert_eq "and it took a second read to see it" "2" "$(gh_calls)"
+
+: > "$GH_STUB_COUNT"
+GH_STUB_FAIL_FIRST=yes GH_STUB_PR_JSON="$APPROVED_JSON" \
+  verify_review_landed 99 "$REVIEWER" "$(log 'VERDICT: approve')" > /dev/null 2>&1
+assert_eq "a transient read failure is retried, not fatal" "0" "$?"
+
+: > "$GH_STUB_COUNT"
+GH_STUB_PR_JSON="$NO_REVIEWS" verify_review_landed 99 "$REVIEWER" \
+  "$(log 'VERDICT: approve')" > /dev/null 2>&1
+assert_eq "a genuinely missing review still fails after the retries" "1" "$?"
+assert_eq "having looked REVIEW_VERIFY_ATTEMPTS times" "$REVIEW_VERIFY_ATTEMPTS" "$(gh_calls)"
+
+REVIEW_VERIFY_ATTEMPTS=1
+: > "$GH_STUB_COUNT"
+GH_STUB_PR_JSON="$NO_REVIEWS" verify_review_landed 99 "$REVIEWER" \
+  "$(log 'VERDICT: approve')" > /dev/null 2>&1
+assert_eq "REVIEW_VERIFY_ATTEMPTS=1 fails on the first look" "1" "$?"
+assert_eq "and reads GitHub exactly once" "1" "$(gh_calls)"
+REVIEW_VERIFY_ATTEMPTS=3
 
 finish
