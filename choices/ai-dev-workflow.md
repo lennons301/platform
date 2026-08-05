@@ -29,29 +29,10 @@ Durable knowledge lives in the repo; work state lives in the tracker.
 milestones), `CONTEXT.md` (domain model, terminology, invariants), `docs/adr/`
 (decision records — the *why*, written during grilling sessions).
 
-**Tracker (transient work state):** milestones group the issues for one roadmap
-item (grill → spec → tickets → execute → review → close → next); a `wayfinder:map`
-issue indexes a large fuzzy initiative while it is being charted, and closes once
-its destination is realised (see *Object lifecycle*). No tracker object outlives
-the durable artefact that supersedes it.
-
-## Object lifecycle
-
-**No artefact outlives its successor.** Each generation phase publishes a tracker
-object, and each is closed once the downstream object that supersedes it exists —
-so the tracker never shows superseded work as live, startable, or countable.
-Durable knowledge is never lost to a close: it has already moved to its successor.
-
-| Object | Closes when | Its record lives on as |
-|---|---|---|
-| `wayfinder:*` child ticket | on resolution | a *Decisions-so-far* pointer on the map (+ an ADR if it settled a design decision) |
-| `wayfinder:map` | its destination is realised — the spec+tickets exist, the decision is locked as an ADR, or the in-place change is made; a redrawn destination is a **fresh map**, not a reopening | the spec/tickets it produced, plus ADRs |
-| Spec issue (`/to-spec`) | `/to-tickets` decomposes it — closed with a comment linking the tickets it produced | the build tickets and their milestone |
-| Build ticket (`/to-tickets`) | its PR merges | merged code |
-| Milestone | it reaches `0 open` (milestone-autoclose) | — |
-
-The per-object *operational* specifics — how to close the spec issue, the `n+1`
-milestone-count trap, the frontier query — live in *After /to-tickets*.
+**Tracker (transient work state):** the issues, PRs, and milestones for work in
+flight. Tracker state is *derived* — it coordinates work whose durable result
+lands in the repo — so no tracker object outlives the artefact that supersedes it
+(see *Object lifecycle*).
 
 ## Labels (canonical roles)
 
@@ -71,7 +52,7 @@ and all are legitimate:
 
 - the owner applying the label directly;
 - an interactive session applying it to tickets the owner has just approved —
-  a `/to-tickets` run, say, where the breakdown was reviewed before publishing;
+  a generation run, say, where the breakdown was reviewed before publishing;
 - an agent *asking* — a triage pass recommending a ticket in Discord, the owner
   replying yes, the orchestrator applying the label on that confirmation.
 
@@ -254,6 +235,24 @@ Interlude's autonomous executor applies the same rule as a claim-eligibility
 check (Phase 5). Publishing a generated batch **unlabelled** and arming from
 the frontier keeps `ready-for-agent` doing one honest job: it is both the
 launch button and the sequencer.
+
+## Object lifecycle
+
+**No artefact outlives its successor.** Each generation phase publishes a tracker
+object, and each is closed once the downstream object that supersedes it exists —
+so the tracker never shows superseded work as live, startable, or countable.
+Durable knowledge is never lost to a close: it has already moved to its successor.
+
+| Object | Closes when | Its record lives on as |
+|---|---|---|
+| `wayfinder:*` child ticket | on resolution | a *Decisions-so-far* pointer on the map (+ an ADR if it settled a design decision) |
+| `wayfinder:map` | its destination is realised — the spec+tickets exist, the decision is locked as an ADR, or the in-place change is made; a redrawn destination is a **fresh map**, not a reopening | the spec/tickets it produced, plus ADRs |
+| Spec issue (`/to-spec`) | `/to-tickets` decomposes it — closed with a comment linking the tickets it produced | the build tickets and their milestone |
+| Build ticket (`/to-tickets`) | its PR merges | merged code |
+| Milestone | it reaches `0 open` (milestone-autoclose) | — |
+
+The per-object *operational* specifics — how to close the spec issue, the `n+1`
+milestone-count trap, the frontier query — are in *After /to-tickets* above.
 
 ## Execution: independent per-ticket loops
 
