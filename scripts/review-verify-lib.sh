@@ -33,7 +33,7 @@ claimed_review_verdict() {
   local log="$1"
   [ -f "$log" ] || return 1
 
-  local line word rest
+  local line word
   # Tolerate markdown around the marker: **VERDICT:** `approve`, ## VERDICT: …
   line="$(grep -iE 'verdict[^a-z0-9]{0,4}:' "$log" | tail -1 || true)"
   [ -n "$line" ] || return 1
@@ -42,7 +42,7 @@ claimed_review_verdict() {
   line="$(printf '%s' "$line" | tr '[:upper:]' '[:lower:]' | tr -d '*`_"#')"
   word="${line#*verdict}"
   word="${word#*:}"
-  read -r word rest <<< "$word" || true
+  read -r word _ <<< "$word" || true
   word="${word%%[!a-z0-9-]*}"   # trailing punctuation: "approve." -> "approve"
 
   # Single-token match, so two-word phrasings ("request changes", "human
