@@ -8,11 +8,12 @@
 Five stages carry a work item from idea to landed code, coordinated through one
 shared **tracker**:
 
-**(idea) → [triage] → Generation → [arm] → Execution ⇄ Review → [land] → (deployment)**
+**Generation → [arm] → Execution ⇄ Review → [land] → (deployment)**
 
-- **Generation** turns intent into published, typed work items. Its front door
-  is **triage**: an inbound idea (`needs-triage`) is routed — into the flow, back
-  for information, to a human, or closed.
+- **Generation** turns intent into published, typed work items. Ideas reach it
+  by more than one route — **triage** routes *inbound* ones (into a lane, back
+  for information, to a human, or closed); an owner with a clear idea starts a
+  lane directly.
 - **Execution** takes one armed item and produces a candidate change — a PR.
 - **Review** judges that candidate with fresh eyes and decides its fate.
 - **Deployment** is downstream: landing a PR hands off to `ci-cd.md`; this
@@ -46,9 +47,10 @@ reproduce them:
 1. **Bounded loops** — every cycle has a deterministic exit or an escape to a
    human (≤N attempts, repair-then-`ready-for-human`, changes-requested
    routing). No unattended thrash.
-2. **Sequencing is data, not memory** — dependency order lives as edges in the
-   tracker; the executable set is the *frontier*, derived, never held in an
-   orchestrator's head.
+2. **Blocks are data, not memory** — items are grouped into a block (a
+   milestone) with a `0 open` completion signal, and any ordering within lives
+   as dependency edges; the executable set is the derived *frontier*. Both the
+   grouping and the ordering live in the tracker, never in an orchestrator's head.
 3. **Typed, provenance-gated entry** — one tracker holds many entity types
    (ideas, specs, maps, work items); only a correctly-typed item, armed by an
    explicit human decision, enters Execution.
@@ -65,10 +67,12 @@ complications to hide; they're the load-bearing rules.
 
 ## Generation
 
-Generation turns intent into **published, typed work items**. Its front door is
-**triage** (`/triage`): an inbound idea starts `needs-triage` and is routed —
-into one of the lanes below, back for detail (`needs-info`), to a human
-(`ready-for-human`), or closed (`wontfix`). What *leaves* Generation is one or
+Generation turns intent into **published, typed work items**. There's more than
+one way in: **triage** (`/triage`) is the route for *inbound* ideas — an issue
+starts `needs-triage` and is routed into one of the lanes below, back for detail
+(`needs-info`), to a human (`ready-for-human`), or closed (`wontfix`) — while an
+owner with a clear idea just starts a lane directly (or drops a single
+`ready-for-agent` ticket). However it entered, what *leaves* Generation is one or
 more items on the tracker, still **unarmed**: arming is a separate human step
 (see *Who may arm a ticket*).
 
@@ -99,7 +103,7 @@ by slash command; an agent never picks one up on its own.
 | `/grill-with-docs` | Same, but updates `CONTEXT.md` and ADRs as decisions crystallise |
 | `/to-spec` | Work was already discussed — skip the interview, write up what was agreed |
 | `/to-tickets` | Break a spec/plan/conversation into thin vertical-slice issues, dependency-ordered |
-| `/triage` | Move issues through the label lifecycle — the intake route above |
+| `/triage` | Move issues through the label lifecycle — the intake route for *inbound* ideas |
 | `/wayfinder` | Charts a large fuzzy initiative as a map of **decision** tickets — see below |
 | `/improve-codebase-architecture` | Scan for shallow modules, get an HTML report of deepening candidates, grill through one |
 
@@ -173,24 +177,29 @@ lands in the repo — so no tracker object outlives the artefact that supersedes
 
 ### Managing blocks: milestones, dependencies, the frontier
 
-A generation run drops a batch of tickets into a repo that already has other
-issues. Three rules keep the batch legible afterwards — they apply to every
-generation run, not just the first.
+A **block** is a set of work items grouped under one milestone and tracked to a
+single completion signal — `0 open`. Most blocks come from a **generation run**
+dropping a batch of tickets under a milestone named for the roadmap item; a block
+can also be **assembled** from existing, independent items — a clutch of proposed
+UX improvements pulled from the backlog, say — grouped to track them to
+completion even though each is independently releasable. Three rules keep any
+block legible:
 
-**1. The milestone is the phase; the spec issue is not part of it.** Group the
-generated tickets under one milestone named for the roadmap item. `0 open` on
-that milestone is the completion signal, and it only means something if
-everything in it is *work*. So once `/to-tickets` has decomposed a spec issue,
-close the spec issue with a comment linking the tickets it produced — *Object
-lifecycle*: no artefact outlives its successor. (`/to-tickets` deliberately never
+**1. The milestone holds only work; a spec is not part of it.** `0 open` is the
+completion signal, and it only means something if everything in the milestone is
+*work*. So when a block came from a spec, close that spec issue once `/to-tickets`
+has decomposed it — with a comment linking the tickets it produced (*Object
+lifecycle*: no artefact outlives its successor). (`/to-tickets` deliberately never
 touches a parent issue — it can't tell a one-off spec from a `wayfinder:map`, so
-the close is the human's call.) Leaving it open inside the milestone parks the
-count at `n+1` forever and makes the spec show up as startable work.
+the close is the human's call.) Left open inside the milestone, the spec parks
+the count at `n+1` forever and shows up as startable work.
 
 **2. Dependency order is data, not memory.** `/to-tickets` records blocking
 edges as native GitHub issue dependencies. GitHub counts only *open* blockers,
 so a ticket is on the frontier exactly when `blocked_by` is 0, and it becomes
 eligible on its own as its blockers close. Nothing needs re-sequencing by hand.
+An assembled block of independent items simply carries no edges — every item is
+on the frontier at once.
 
 **3. Arm from the frontier.** The frontier query — open, in the milestone, no
 open blockers:
@@ -356,23 +365,19 @@ vocabulary, and where `CONTEXT.md`/ADRs live (writes `docs/agents/`).
 
 ### Capability contracts
 
-A failure class found live on interlude#29 / platform#12: **a pass prompt
-promising capabilities the executor doesn't actually provide**. The laptop
-runner's implement pass instructed `gh issue view`, `git commit`,
-`gh pr create` — but pre-approved only `git push` and `doppler run`, so on a
-repo whose allowlist hadn't grown those verbs the headless pass was
-auto-denied everything it was told to do, *including its own escape hatch*
-(comment + relabel `ready-for-human`). Permission rules are only one way to
-hit the class: a container with no authenticated `gh`, or a
-`workflow:<skill>` label naming a skill the executor doesn't have, fails the
-same way.
+**A pass must never be promised a capability its executor doesn't actually
+provide.** The failure is silent and total: a headless pass told to run a
+command it isn't permitted, to call a `gh` it can't authenticate, or to invoke a
+`workflow:<skill>` the executor doesn't have is auto-denied everything it was
+told to do — *including its own escape hatch* (comment + relabel
+`ready-for-human`) — and stalls without recourse.
 
 The rule: **every executor states an explicit capability contract for its
 passes — what the agent can run, what auth it has, which skills resolve —
 and its pass prompts are derived from that contract**, so prompt and
 capabilities cannot drift.
 
-Instances:
+This estate's bindings:
 
 - **The laptop runner** (`scripts/ticket-loop.sh`): the contract is the
   `IMPLEMENT_VERBS` / `REPAIR_VERBS` / `REVIEW_VERBS` arrays. Each pass's
@@ -390,7 +395,7 @@ Instances:
   credential helper), so it cannot hit the permission variant — but its
   implement prompt must not instruct `gh` verbs the container cannot
   authenticate, and `workflow:<skill>` labels must resolve to skills the
-  container actually has (interlude#15, interlude#28).
+  container actually has.
 
 ### PR-state dispatch & the repair pass
 
@@ -532,16 +537,13 @@ landing, a mistaken or compromised approval still cannot auto-land a gated path.
 
 ### Verified side effects: a pass's narration is not evidence
 
-The capability-contract drift has a twin one step later (see *Capability
-contracts* under Execution), with the capabilities all present: a pass reports
-work it never did. interlude PR #99 (2026-08-05, platform#21) — the review pass
-produced a complete `VERDICT: approve` with reasoning and stated "my approval
-satisfies branch protection; a human performs the merge", while GitHub showed
-`reviews: []` / `reviewDecision: REVIEW_REQUIRED`. Nothing had been submitted.
-The runner exited 0 and reported success; the owner caught it by looking at the
-PR. Minutes earlier the same runner and identity had submitted PR #98's approval
-fine, so the PAT and the verbs worked — that pass simply skipped or lost its
-`gh pr review` step and narrated success anyway.
+**A pass's narration is never evidence that its side effect landed.** The twin
+of the capability-contract drift (see *Capability contracts* under Execution),
+one step later: the capabilities are all present, but a pass reports work it
+never did. The classic case is a review pass that emits a complete
+`VERDICT: approve` with full reasoning while GitHub shows no review submitted —
+a runner that trusts the narration exits 0 on an approval that isn't there.
+(This estate hit exactly that; the owner caught it by eye.)
 
 The rule: **where a pass's job is a side effect, the runner verifies the side
 effect before reporting — never the pass's account of it.** The runner already
