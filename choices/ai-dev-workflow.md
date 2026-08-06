@@ -3,77 +3,120 @@
 **Current choice:** ticket-loop — the only one. Superpowers was retired on
 2026-07-31.
 
-## Decision
+## The workflow at a glance
 
-Development work is split into two loosely-coupled halves, connected through
-GitHub Issues:
+Five stages carry a work item from idea to landed code, coordinated through one
+shared **tracker**:
 
-1. **Work item generation** — align on what to build, write it down once,
-   break it into tickets. The output is *published* to the repo's issue
-   tracker. If it isn't in the tracker, it doesn't exist.
-2. **Work execution** — humans or agents pick up tickets and work them
-   independently, each in its own fresh Claude instance and worktree. The
-   tracker coordinates; a chain of dependent tickets can be sequenced and
-   driven, but never by collapsing tickets into one shared context or into
-   subagents (see *Execution: independent per-ticket loops*).
+**Generation → [arm] → Execution ⇄ Review → [land] → (deployment)**
 
-The published tickets are the interface: any tool can generate them, any agent
-or human can execute them, and either side can be swapped without breaking the
-other.
+- **Generation** turns intent into published, typed work items. Ideas reach it
+  by more than one route — **triage** routes *inbound* ones (into a lane, back
+  for information, to a human, or closed); an owner with a clear idea starts a
+  lane directly.
+- **Execution** takes one armed item and produces a candidate change — a PR.
+- **Review** judges that candidate with fresh eyes and decides its fate.
+- **Deployment** is downstream: landing a PR hands off to `ci-cd.md`; this
+  document owns up to the land decision, no further.
 
-## Repo documents vs tracker state
+**Tracking is not a stage — it is the substrate.** Every handover happens
+*through* the tracker: Generation publishes typed items into it, Execution
+claims them from it, Review records verdicts on it. The tracker is the
+coordinator; no orchestrator holds the workflow in its head. If it isn't in the
+tracker, it doesn't exist. The published items are the interface — any tool can
+generate them, any agent or human can execute them, and either side can be
+swapped without breaking the other.
 
-Durable knowledge lives in the repo; work state lives in the tracker.
+The shape is a **state machine, not a pipeline** — Execution and Review form a
+loop (changes-requested routes back), and repair/attempt loops sit inside
+Execution. The handovers are the triggers between states:
 
-**Repo (versioned, read every session):** `ROADMAP.md` (coarse, priority-ordered
-milestones), `CONTEXT.md` (domain model, terminology, invariants), `docs/adr/`
-(decision records — the *why*, written during grilling sessions).
+| Handover | Trigger | Detailed in |
+|---|---|---|
+| Generation → Execution | **arming** — a human-decided `ready-for-agent` on a frontier item | *Tracking* |
+| Execution → Review | a PR whose objective signals pass | *Execution* |
+| Review → land | a gate-cleared approval | *Review* / *Landing* |
+| Review → Execution | changes requested (the loop) | *Review* |
 
-**Tracker (transient work state):** the issues, PRs, and milestones for work in
-flight. Tracker state is *derived* — it coordinates work whose durable result
-lands in the repo — so no tracker object outlives the artefact that supersedes it
-(see *Object lifecycle*).
+### What makes it autonomous — and transportable
 
-## Labels (canonical roles)
+These invariants are tool-agnostic; GitHub Issues, the mattpocock skills, and
+`ticket-loop.sh` are just this estate's bindings of them. Any port must
+reproduce them:
 
-`needs-triage` → `needs-info` | `ready-for-agent` | `ready-for-human` | `wontfix`
+1. **Bounded loops** — every cycle has a deterministic exit or an escape to a
+   human (≤N attempts, repair-then-`ready-for-human`, changes-requested
+   routing). No unattended thrash.
+2. **Blocks are data, not memory** — items are grouped into a block (a
+   milestone) with a `0 open` completion signal, and any ordering within lives
+   as dependency edges; the executable set is the derived *frontier*. Both the
+   grouping and the ordering live in the tracker, never in an orchestrator's head.
+3. **Typed, provenance-gated entry** — one tracker holds many entity types
+   (ideas, specs, maps, work items); only a correctly-typed item, armed by an
+   explicit human decision, enters Execution.
+4. **The coordinator verifies side effects** — the runner checks the system of
+   record (mergeability, whether a review actually landed), never a pass's
+   narration of what it did.
+5. **Fresh, independent actors** — one fresh instance per item, Review by a
+   separate identity, no shared-context orchestration, never subagents.
+6. **Landing is decided by deterministic gates**, not the reviewer's discretion.
 
-- `ready-for-agent` (AFK) — an agent can implement and merge unattended
-- `ready-for-human` (HITL) — needs a human decision or human implementation
+Invariants 1–3 are exactly the three things that make this *look* complicated —
+loops, blocks of work, and one tracker holding many entity types. They aren't
+complications to hide; they're the load-bearing rules.
 
-## Who may arm a ticket
+## This implementation at a glance
 
-Applying `ready-for-agent` is the launch button: it authorises unattended code
-to land. The rule is about **provenance, not about who types the command**.
+The model above is tool-agnostic; here is what *this* estate binds each part to.
+Everything in the right column is a swappable choice — the model doesn't depend
+on any of it.
 
-**Arming requires an explicit human decision, expressed through any channel
-where the human is actually deciding.** All of these are the owner arming work,
-and all are legitimate:
+| Stage / part | This estate's binding |
+|---|---|
+| **Generation** | the **mattpocock-skills** suite — `/triage`, `/grill-me`, `/grill-with-docs`, `/to-spec`, `/to-tickets`, `/wayfinder` — driven by slash command |
+| **Tracking** (substrate) | **GitHub Issues**: labels for entity types + roles, native issue dependencies for the frontier, milestones for blocks |
+| **Execution** | **`scripts/ticket-loop.sh`** (primary) — a thin per-invocation runner. The invariant is *a fresh `claude` instance per ticket*, so any driver that launches those also works: labels + auto-pickup, a session running the runner, Claude agents, or manual CLI |
+| **Per-ticket workflow** | the plugin's model-invocable skills (`/tdd`, `/diagnosing-bugs`, …), selected by a `workflow:<skill>` label |
+| **Review** | the **`ticket-reviewer`** agent, run under a dedicated GitHub **machine account** (PAT in Doppler); a deterministic **review gate** (`standards/review-gates.yaml`) decides landing |
+| **Landing / deployment** | GitHub **auto-merge** (armed by the gate) or a **`human-signoff`** manual merge; deployment proper lives in `ci-cd.md` |
 
-- the owner applying the label directly;
-- an interactive session applying it to tickets the owner has just approved —
-  a generation run, say, where the breakdown was reviewed before publishing;
-- an agent *asking* — a triage pass recommending a ticket in Discord, the owner
-  replying yes, the orchestrator applying the label on that confirmation.
+### Anatomy of a `ticket-loop.sh` pass
 
-**No unattended pass may arm on its own judgement.** Triage, the autonomous
-executor, and anything else reading inbound issues may recommend, label
-`needs-info`, or label `ready-for-human` — never `ready-for-agent`. The reason
-is provenance: an issue body is untrusted text, so a pass that can both read one
-and arm it hands the launch button to whoever opened the issue.
+The runner works one ticket per invocation by launching **passes**. A *pass* is a
+headless `claude -p "<prompt>"` process, run fresh in the ticket's own worktree,
+whose `--allowedTools` is rendered from that pass's verb array — its *capability
+contract* (see *Capability contracts*). There are three:
 
-A confirmation is only a decision if the owner saw what they were agreeing to.
-Record the arming route on the issue, so "who armed this and on what basis" is
-answerable after the fact.
+- **Implement pass** — the execution prompt proper: an eight-step script that
+  reads issue #N *as the spec* → reads `AGENTS.md`/`CONTEXT.md`/ADRs → implements
+  in small atomic commits → validates (tests/lint under `doppler run`) →
+  self-reviews with `/code-review` → pushes and opens a PR (`Closes #N`) →
+  confirms the PR is `MERGEABLE` → and, if genuinely blocked, comments and
+  relabels `ready-for-human` (the escape hatch). One attempt per invocation, up
+  to `MAX_ATTEMPTS`.
+- **Repair pass** — a narrower prompt for a `CONFLICTING` PR: merge the default
+  branch (never rebase or force-push), resolve with `/resolving-merge-conflicts`,
+  re-validate, push. No attempt consumed.
+- **Review pass** — launches the `ticket-reviewer` agent under the reviewer
+  identity and must end with a machine-readable `VERDICT:` line the runner checks
+  against GitHub (see *Verified side effects*).
 
-Claim eligibility is a second, independent control: an issue whose author is not
-allow-listed is not claimable even when labelled, so the label alone was never
-the only thing between an outside contributor and a merge.
+Which pass runs is decided by *PR-state dispatch* (under *Execution*); it is all
+deterministic shell — the model's invariants live in the runner, never in an
+agent's head.
 
-Whether to arm a whole generated batch at once is a *pacing* decision, separate
-from all of the above, and belongs to the owner batch by batch.
+## Generation
 
-## The generation flow
+Generation turns intent into **published, typed work items**. There's more than
+one way in: **triage** (`/triage`) is the route for *inbound* ideas — an issue
+starts `needs-triage` and is routed into one of the lanes below, back for detail
+(`needs-info`), to a human (`ready-for-human`), or closed (`wontfix`) — while an
+owner with a clear idea just starts a lane directly (or drops a single
+`ready-for-agent` ticket). However it entered, what *leaves* Generation is one or
+more items on the tracker, still **unarmed**: arming is a separate human step
+(see *Who may arm a ticket*).
+
+### The generation flow
 
 Ticket generation isn't a single pipeline — it's a decision tree keyed on **how
 big and how foggy** the work is. Pick the entry point that fits; the lanes all
@@ -100,7 +143,7 @@ by slash command; an agent never picks one up on its own.
 | `/grill-with-docs` | Same, but updates `CONTEXT.md` and ADRs as decisions crystallise |
 | `/to-spec` | Work was already discussed — skip the interview, write up what was agreed |
 | `/to-tickets` | Break a spec/plan/conversation into thin vertical-slice issues, dependency-ordered |
-| `/triage` | Move issues through the label lifecycle |
+| `/triage` | Move issues through the label lifecycle — the intake route for *inbound* ideas |
 | `/wayfinder` | Charts a large fuzzy initiative as a map of **decision** tickets — see below |
 | `/improve-codebase-architecture` | Scan for shallow modules, get an HTML report of deepening candidates, grill through one |
 
@@ -142,7 +185,171 @@ to lane 2/3, a decision locked as an ADR, or an in-place change). Individual
 tickets, `task` included, are internal steps toward it, never exits in their own
 right. When the destination is realised, the map closes (see *Object lifecycle*).
 
-## Execution skills
+## Tracking (the substrate)
+
+Tracking is the substrate the other stages hand off through: a single **typed
+store** that holds several entity kinds at once — unspecced ideas, specs,
+`wayfinder:map`s and their decision tickets, and build tickets — encodes their
+ordering as data, and retires each as its successor appears. The rules that
+follow — what lives where, the label roles, how blocks of work are sequenced,
+who may arm, and when objects close — are what let the four activity stages run
+without an orchestrator.
+
+### Repo documents vs tracker state
+
+Durable knowledge lives in the repo; work state lives in the tracker.
+
+**Repo (versioned, read every session):** `ROADMAP.md` (coarse, priority-ordered
+milestones), `CONTEXT.md` (domain model, terminology, invariants), `docs/adr/`
+(decision records — the *why*, written during grilling sessions).
+
+**Tracker (transient work state):** the issues, PRs, and milestones for work in
+flight. Tracker state is *derived* — it coordinates work whose durable result
+lands in the repo — so no tracker object outlives the artefact that supersedes it
+(see *Object lifecycle*).
+
+### Labels (canonical roles)
+
+`needs-triage` → `needs-info` | `ready-for-agent` | `ready-for-human` | `wontfix`
+
+- `ready-for-agent` (AFK) — an agent can implement and merge unattended
+- `ready-for-human` (HITL) — needs a human decision or human implementation
+
+### Managing blocks: milestones, dependencies, the frontier
+
+A **block** is a set of work items grouped under one milestone and tracked to a
+single completion signal — `0 open`. Most blocks come from a **generation run**
+dropping a batch of tickets under a milestone named for the roadmap item; a block
+can also be **assembled** from existing, independent items — a clutch of proposed
+UX improvements pulled from the backlog, say — grouped to track them to
+completion even though each is independently releasable. Three rules keep any
+block legible:
+
+**1. The milestone holds only work; a spec is not part of it.** `0 open` is the
+completion signal, and it only means something if everything in the milestone is
+*work*. So when a block came from a spec, close that spec issue once `/to-tickets`
+has decomposed it — with a comment linking the tickets it produced (*Object
+lifecycle*: no artefact outlives its successor). (`/to-tickets` deliberately never
+touches a parent issue — it can't tell a one-off spec from a `wayfinder:map`, so
+the close is the human's call.) Left open inside the milestone, the spec parks
+the count at `n+1` forever and shows up as startable work.
+
+**2. Dependency order is data, not memory.** `/to-tickets` records blocking
+edges as native GitHub issue dependencies. GitHub counts only *open* blockers,
+so a ticket is on the frontier exactly when `blocked_by` is 0, and it becomes
+eligible on its own as its blockers close. Nothing needs re-sequencing by hand.
+An assembled block of independent items simply carries no edges — every item is
+on the frontier at once.
+
+**3. Arm from the frontier.** The frontier query — open, in the milestone, no
+open blockers:
+
+```bash
+for n in $(gh issue list --milestone "<milestone>" --state open \
+             --limit 100 --json number --jq '.[].number' | sort -n); do
+  gh api "repos/{owner}/{repo}/issues/$n" \
+    --jq 'select((.issue_dependencies_summary.blocked_by // 0) == 0)
+          | "#\(.number)  \(.title)"'
+done
+```
+
+`ticket-loop.sh` skips blocked tickets in its auto-pick and refuses a blocked
+`--issue` outright, so the order survives an armed ticket that isn't ready.
+Interlude's autonomous executor applies the same rule as a claim-eligibility
+check (Phase 5). Publishing a generated batch **unlabelled** and arming from
+the frontier keeps `ready-for-agent` doing one honest job: it is both the
+launch button and the sequencer.
+
+### Object lifecycle
+
+**No artefact outlives its successor.** Each generation phase publishes a tracker
+object, and each is closed once the downstream object that supersedes it exists —
+so the tracker never shows superseded work as live, startable, or countable.
+Durable knowledge is never lost to a close: it has already moved to its successor.
+
+| Object | Closes when | Its record lives on as |
+|---|---|---|
+| `wayfinder:*` child ticket | on resolution | a *Decisions-so-far* pointer on the map (+ an ADR if it settled a design decision) |
+| `wayfinder:map` | its destination is realised — the spec+tickets exist, the decision is locked as an ADR, or the in-place change is made; a redrawn destination is a **fresh map**, not a reopening | the spec/tickets it produced, plus ADRs |
+| Spec issue (`/to-spec`) | `/to-tickets` decomposes it — closed with a comment linking the tickets it produced | the build tickets and their milestone |
+| Build ticket (`/to-tickets`) | its PR merges | merged code |
+| Milestone | it reaches `0 open` (milestone-autoclose) | — |
+
+The per-object *operational* specifics — how to close the spec issue, the `n+1`
+milestone-count trap, the frontier query — are in *Managing blocks* above.
+
+### Who may arm a ticket
+
+Applying `ready-for-agent` is the launch button: it authorises unattended code
+to land — the **Generation → Execution** trigger. The rule is about
+**provenance, not about who types the command**.
+
+**Arming requires an explicit human decision, expressed through any channel
+where the human is actually deciding.** All of these are the owner arming work,
+and all are legitimate:
+
+- the owner applying the label directly;
+- an interactive session applying it to tickets the owner has just approved —
+  a generation run, say, where the breakdown was reviewed before publishing;
+- an agent *asking* — a triage pass recommending a ticket in Discord, the owner
+  replying yes, the orchestrator applying the label on that confirmation.
+
+**No unattended pass may arm on its own judgement.** Triage, the autonomous
+executor, and anything else reading inbound issues may recommend, label
+`needs-info`, or label `ready-for-human` — never `ready-for-agent`. The reason
+is provenance: an issue body is untrusted text, so a pass that can both read one
+and arm it hands the launch button to whoever opened the issue.
+
+A confirmation is only a decision if the owner saw what they were agreeing to.
+Record the arming route on the issue, so "who armed this and on what basis" is
+answerable after the fact.
+
+Claim eligibility is a second, independent control: an issue whose author is not
+allow-listed is not claimable even when labelled, so the label alone was never
+the only thing between an outside contributor and a merge.
+
+Whether to arm a whole generated batch at once is a *pacing* decision, separate
+from all of the above, and belongs to the owner batch by batch.
+
+## Execution
+
+Execution takes one armed item off the frontier and produces a candidate
+change — a PR — through a **bounded loop** run by a **fresh, independent
+actor**: one item, one fresh instance, one worktree. The runner is a thin
+driver, never an orchestrator holding tickets in a shared context. When the
+objective signals pass, it hands the PR to Review.
+
+### Independent per-ticket loops
+
+- Each ticket is worked by one agent (or human) in its own git worktree and
+  branch (`agent/issue-<n>`).
+- The loop: read the ticket fresh → implement → validate (tests/lint) →
+  commit → open PR linking the issue. Stuck after ~3 attempts → stop and
+  label `ready-for-human` rather than thrash.
+- The agent never grades its own work. Done = objective signals pass (tests,
+  lint, CI) **and** a separate reviewer agent — fresh context, fresh GitHub
+  identity, reviewing against repo standards and the originating ticket —
+  approves the PR (the **Execution → Review** handover; see *Review*). The
+  `ticket-reviewer` agent definition is canonical at `templates/agents/` in this
+  repo and synced to `~/.claude/agents/` via `scripts/sync-agents.sh`.
+- **Parallel or sequenced, it's always independent instances.** Running several
+  unrelated tickets at once and driving a dependent chain in order are the same
+  mechanism: independent loops coordinated by the tracker, not one agent holding
+  them in a shared context. There's more than one way to drive a chain —
+  (a) pure labelling: dependency edges plus `ready-for-agent`, each ticket
+  auto-picked in order as its blockers close; (b) a Claude session running
+  `ticket-loop.sh` across the frontier; (c) a user driving Claude agents;
+  (d) manual command-line invocation. The invariant they share: **each ticket is
+  worked by a separate, fresh Claude instance in its own worktree — never a
+  subagent of the driver.** A subagent would share the driver's context and
+  identity, defeating both the fresh-context read and the fresh-identity review.
+  Subagents stay fine for narrow fan-out *within* a ticket (research, scanning).
+- Thin runner: `scripts/ticket-loop.sh` in this repo picks up one
+  `ready-for-agent` issue, runs the implement pass in a worktree, evaluates
+  the review gates, then runs the review pass with fresh context under the
+  reviewer identity.
+
+### Per-ticket skills
 
 The generation skills above are human-driven. These carry no
 `disable-model-invocation`, so an agent inside the loop reaches them on its own —
@@ -175,7 +382,7 @@ doesn't is not ready for an agent.
 first use. It configures the issue tracker (GitHub), the triage label
 vocabulary, and where `CONTEXT.md`/ADRs live (writes `docs/agents/`).
 
-## Workflows per ticket
+### Workflows per ticket
 
 1. **The menu** — the model-invocable skills above *are* the menu. A
    `workflow:<skill>` label on the ticket selects one, and the label name is
@@ -196,101 +403,41 @@ vocabulary, and where `CONTEXT.md`/ADRs live (writes `docs/agents/`).
    promoted: prefer an upstream skill where one fits, otherwise add a named
    workflow to this table via PR.
 
-## After /to-tickets: milestones, frontier, completion
+### Capability contracts
 
-A generation run drops a batch of tickets into a repo that already has other
-issues. Three rules keep the batch legible afterwards — they apply to every
-generation run, not just the first.
+**A pass must never be promised a capability its executor doesn't actually
+provide.** The failure is silent and total: a headless pass told to run a
+command it isn't permitted, to call a `gh` it can't authenticate, or to invoke a
+`workflow:<skill>` the executor doesn't have is auto-denied everything it was
+told to do — *including its own escape hatch* (comment + relabel
+`ready-for-human`) — and stalls without recourse.
 
-**1. The milestone is the phase; the spec issue is not part of it.** Group the
-generated tickets under one milestone named for the roadmap item. `0 open` on
-that milestone is the completion signal, and it only means something if
-everything in it is *work*. So once `/to-tickets` has decomposed a spec issue,
-close the spec issue with a comment linking the tickets it produced — *Object
-lifecycle*: no artefact outlives its successor. (`/to-tickets` deliberately never
-touches a parent issue — it can't tell a one-off spec from a `wayfinder:map`, so
-the close is the human's call.) Leaving it open inside the milestone parks the
-count at `n+1` forever and makes the spec show up as startable work.
+The rule: **every executor states an explicit capability contract for its
+passes — what the agent can run, what auth it has, which skills resolve —
+and its pass prompts are derived from that contract**, so prompt and
+capabilities cannot drift.
 
-**2. Dependency order is data, not memory.** `/to-tickets` records blocking
-edges as native GitHub issue dependencies. GitHub counts only *open* blockers,
-so a ticket is on the frontier exactly when `blocked_by` is 0, and it becomes
-eligible on its own as its blockers close. Nothing needs re-sequencing by hand.
+This estate's bindings:
 
-**3. Arm from the frontier.** The frontier query — open, in the milestone, no
-open blockers:
+- **The laptop runner** (`scripts/ticket-loop.sh`): the contract is the
+  `IMPLEMENT_VERBS` / `REPAIR_VERBS` / `REVIEW_VERBS` arrays. Each pass's
+  `--allowedTools` is rendered from its array, and the permission preflight
+  checks ask/deny rules against the same arrays — one definition, three
+  consumers. Changing a pass prompt (or `templates/agents/ticket-reviewer.md`,
+  which the review pass launches) means updating the matching array in the
+  same change. `REPAIR_VERBS` is the implement set minus the PR-creation
+  verbs (`gh pr list` / `create` / `edit`), keeping `git fetch` /
+  `git merge` — no rebase or force-push verb appears in any headless
+  contract.
+- **Interlude's Phase 5 native executor** provides capabilities
+  architecturally (`--dangerously-skip-permissions` inside isolated
+  containers, GitHub side-effects moved to the orchestrator, git via
+  credential helper), so it cannot hit the permission variant — but its
+  implement prompt must not instruct `gh` verbs the container cannot
+  authenticate, and `workflow:<skill>` labels must resolve to skills the
+  container actually has.
 
-```bash
-for n in $(gh issue list --milestone "<milestone>" --state open \
-             --limit 100 --json number --jq '.[].number' | sort -n); do
-  gh api "repos/{owner}/{repo}/issues/$n" \
-    --jq 'select((.issue_dependencies_summary.blocked_by // 0) == 0)
-          | "#\(.number)  \(.title)"'
-done
-```
-
-`ticket-loop.sh` skips blocked tickets in its auto-pick and refuses a blocked
-`--issue` outright, so the order survives an armed ticket that isn't ready.
-Interlude's autonomous executor applies the same rule as a claim-eligibility
-check (Phase 5). Publishing a generated batch **unlabelled** and arming from
-the frontier keeps `ready-for-agent` doing one honest job: it is both the
-launch button and the sequencer.
-
-## Object lifecycle
-
-**No artefact outlives its successor.** Each generation phase publishes a tracker
-object, and each is closed once the downstream object that supersedes it exists —
-so the tracker never shows superseded work as live, startable, or countable.
-Durable knowledge is never lost to a close: it has already moved to its successor.
-
-| Object | Closes when | Its record lives on as |
-|---|---|---|
-| `wayfinder:*` child ticket | on resolution | a *Decisions-so-far* pointer on the map (+ an ADR if it settled a design decision) |
-| `wayfinder:map` | its destination is realised — the spec+tickets exist, the decision is locked as an ADR, or the in-place change is made; a redrawn destination is a **fresh map**, not a reopening | the spec/tickets it produced, plus ADRs |
-| Spec issue (`/to-spec`) | `/to-tickets` decomposes it — closed with a comment linking the tickets it produced | the build tickets and their milestone |
-| Build ticket (`/to-tickets`) | its PR merges | merged code |
-| Milestone | it reaches `0 open` (milestone-autoclose) | — |
-
-The per-object *operational* specifics — how to close the spec issue, the `n+1`
-milestone-count trap, the frontier query — are in *After /to-tickets* above.
-
-## Execution: independent per-ticket loops
-
-- Each ticket is worked by one agent (or human) in its own git worktree and
-  branch (`agent/issue-<n>`).
-- The loop: read the ticket fresh → implement → validate (tests/lint) →
-  commit → open PR linking the issue. Stuck after ~3 attempts → stop and
-  label `ready-for-human` rather than thrash.
-- The agent never grades its own work. Done = objective signals pass (tests,
-  lint, CI) **and** a separate reviewer agent — fresh context, fresh GitHub
-  identity, reviewing against repo standards and the originating ticket —
-  approves the PR. The `ticket-reviewer` agent definition is canonical at
-  `templates/agents/` in this repo and synced to `~/.claude/agents/` via
-  `scripts/sync-agents.sh`.
-- Whether an approval may *land* the PR is decided deterministically, not by
-  the reviewer: the runner matches changed paths against
-  `standards/review-gates.yaml` (+ the repo's `docs/agents/review-gates.yaml`
-  extension). No match → auto-merge armed (squash); approval lands it. Match →
-  `human-signoff` label, auto-merge off; a human merges after looking. See
-  `standards/review-gates.md`.
-- **Parallel or sequenced, it's always independent instances.** Running several
-  unrelated tickets at once and driving a dependent chain in order are the same
-  mechanism: independent loops coordinated by the tracker, not one agent holding
-  them in a shared context. There's more than one way to drive a chain —
-  (a) pure labelling: dependency edges plus `ready-for-agent`, each ticket
-  auto-picked in order as its blockers close; (b) a Claude session running
-  `ticket-loop.sh` across the frontier; (c) a user driving Claude agents;
-  (d) manual command-line invocation. The invariant they share: **each ticket is
-  worked by a separate, fresh Claude instance in its own worktree — never a
-  subagent of the driver.** A subagent would share the driver's context and
-  identity, defeating both the fresh-context read and the fresh-identity review.
-  Subagents stay fine for narrow fan-out *within* a ticket (research, scanning).
-- Thin runner: `scripts/ticket-loop.sh` in this repo picks up one
-  `ready-for-agent` issue, runs the implement pass in a worktree, evaluates
-  the review gates, then runs the review pass with fresh context under the
-  reviewer identity.
-
-## PR-state dispatch & the repair pass
+### PR-state dispatch & the repair pass
 
 Parked PRs go stale underneath the loop: gated (`human-signoff`) PRs wait for
 a human merge, and each human merge can flip the still-parked ones to
@@ -339,81 +486,16 @@ mergeability and routes `CONFLICTING` into the same repair machinery before
 gates/review. Repair keeps parked PRs mergeable; it never merges them —
 `human-signoff` still means a human merges.
 
-## Capability contracts
+## Review
 
-A failure class found live on interlude#29 / platform#12: **a pass prompt
-promising capabilities the executor doesn't actually provide**. The laptop
-runner's implement pass instructed `gh issue view`, `git commit`,
-`gh pr create` — but pre-approved only `git push` and `doppler run`, so on a
-repo whose allowlist hadn't grown those verbs the headless pass was
-auto-denied everything it was told to do, *including its own escape hatch*
-(comment + relabel `ready-for-human`). Permission rules are only one way to
-hit the class: a container with no authenticated `gh`, or a
-`workflow:<skill>` label naming a skill the executor doesn't have, fails the
-same way.
+Review judges the candidate with **fresh eyes and a separate identity** and
+decides its fate — approve, request changes (back to Execution, the loop), or
+escalate to a human. Two rules keep it honest and autonomous: a **deterministic
+gate** decides whether an approval may auto-land, not the reviewer; and the
+**coordinator verifies the verdict actually landed** on the PR rather than
+trusting the pass's narration.
 
-The rule: **every executor states an explicit capability contract for its
-passes — what the agent can run, what auth it has, which skills resolve —
-and its pass prompts are derived from that contract**, so prompt and
-capabilities cannot drift.
-
-Instances:
-
-- **The laptop runner** (`scripts/ticket-loop.sh`): the contract is the
-  `IMPLEMENT_VERBS` / `REPAIR_VERBS` / `REVIEW_VERBS` arrays. Each pass's
-  `--allowedTools` is rendered from its array, and the permission preflight
-  checks ask/deny rules against the same arrays — one definition, three
-  consumers. Changing a pass prompt (or `templates/agents/ticket-reviewer.md`,
-  which the review pass launches) means updating the matching array in the
-  same change. `REPAIR_VERBS` is the implement set minus the PR-creation
-  verbs (`gh pr list` / `create` / `edit`), keeping `git fetch` /
-  `git merge` — no rebase or force-push verb appears in any headless
-  contract.
-- **Interlude's Phase 5 native executor** provides capabilities
-  architecturally (`--dangerously-skip-permissions` inside isolated
-  containers, GitHub side-effects moved to the orchestrator, git via
-  credential helper), so it cannot hit the permission variant — but its
-  implement prompt must not instruct `gh` verbs the container cannot
-  authenticate, and `workflow:<skill>` labels must resolve to skills the
-  container actually has (interlude#15, interlude#28).
-
-### Verified side effects: a pass's narration is not evidence
-
-The same drift shows up one step later, with the capabilities all present: a
-pass reports work it never did. interlude PR #99 (2026-08-05, platform#21) —
-the review pass produced a complete `VERDICT: approve` with reasoning and
-stated "my approval satisfies branch protection; a human performs the merge",
-while GitHub showed `reviews: []` / `reviewDecision: REVIEW_REQUIRED`. Nothing
-had been submitted. The runner exited 0 and reported success; the owner caught
-it by looking at the PR. Minutes earlier the same runner and identity had
-submitted PR #98's approval fine, so the PAT and the verbs worked — that pass
-simply skipped or lost its `gh pr review` step and narrated success anyway.
-
-The rule: **where a pass's job is a side effect, the runner verifies the side
-effect before reporting — never the pass's account of it.** The runner already
-does this for mergeability (it polls `mergeable` rather than trusting the
-implement pass's word) and now for the review itself:
-
-- the review pass must end its output with a machine-readable
-  `VERDICT: approve | request-changes | comment | escalate` line;
-- the runner reads that line, then reads the reviewer identity's own review off
-  the PR (`gh pr view --json reviewDecision,latestReviews`) and requires the two
-  to agree — `approve` → `APPROVED`, `request-changes` → `CHANGES_REQUESTED`,
-  `comment` → `COMMENTED`, `escalate` → anything but an approval (it submits a
-  PR comment, not a review);
-- a mismatch exits non-zero naming what the pass claimed against what GitHub
-  shows. A pass that emits no readable verdict, or a PR read that fails, is
-  *unverifiable* — also non-zero, because "can't tell" is not "fine".
-
-Logic lives in `scripts/review-verify-lib.sh` (tested by
-`checks/tests/test-review-verify.sh`); mismatches are re-read a few times first
-(`REVIEW_VERIFY_ATTEMPTS` / `REVIEW_VERIFY_SLEEP`) since review data reads back
-through GraphQL and falsely failing a real approval is as wrong as passing a
-phantom one. A failed run leaves the PR unreviewed and mergeable, which the
-PR-state dispatch above routes straight back into gates + review on the next
-invocation — no attempt consumed.
-
-## Reviewer identity & onboarding
+### Reviewer identity & onboarding
 
 The review pass runs as a dedicated GitHub **machine account** so its
 approvals are accepted (GitHub rejects self-approval) and can trigger
@@ -483,11 +565,62 @@ repair passes only — the review pass always runs under permissions.) The carri
 and the preflight's checked set are one definition in the runner — see
 *Capability contracts* above.
 
+### Review gates
+
+Whether an approval may *land* the PR is decided deterministically, not by the
+reviewer: the runner matches changed paths against `standards/review-gates.yaml`
+(+ the repo's `docs/agents/review-gates.yaml` extension). No match → auto-merge
+armed (squash); the approval lands it. Match → `human-signoff` label, auto-merge
+off; a human merges after looking (see *Landing the PR*). See
+`standards/review-gates.md`. Because the gate — not the reviewer — decides
+landing, a mistaken or compromised approval still cannot auto-land a gated path.
+
+### Verified side effects: a pass's narration is not evidence
+
+**A pass's narration is never evidence that its side effect landed.** The twin
+of the capability-contract drift (see *Capability contracts* under Execution),
+one step later: the capabilities are all present, but a pass reports work it
+never did. The classic case is a review pass that emits a complete
+`VERDICT: approve` with full reasoning while GitHub shows no review submitted —
+a runner that trusts the narration exits 0 on an approval that isn't there.
+(This estate hit exactly that; the owner caught it by eye.)
+
+The rule: **where a pass's job is a side effect, the runner verifies the side
+effect before reporting — never the pass's account of it.** The runner already
+does this for mergeability (it polls `mergeable` rather than trusting the
+implement pass's word) and now for the review itself:
+
+- the review pass must end its output with a machine-readable
+  `VERDICT: approve | request-changes | comment | escalate` line;
+- the runner reads that line, then reads the reviewer identity's own review off
+  the PR (`gh pr view --json reviewDecision,latestReviews`) and requires the two
+  to agree — `approve` → `APPROVED`, `request-changes` → `CHANGES_REQUESTED`,
+  `comment` → `COMMENTED`, `escalate` → anything but an approval (it submits a
+  PR comment, not a review);
+- a mismatch exits non-zero naming what the pass claimed against what GitHub
+  shows. A pass that emits no readable verdict, or a PR read that fails, is
+  *unverifiable* — also non-zero, because "can't tell" is not "fine".
+
+Logic lives in `scripts/review-verify-lib.sh` (tested by
+`checks/tests/test-review-verify.sh`); mismatches are re-read a few times first
+(`REVIEW_VERIFY_ATTEMPTS` / `REVIEW_VERIFY_SLEEP`) since review data reads back
+through GraphQL and falsely failing a real approval is as wrong as passing a
+phantom one. A failed run leaves the PR unreviewed and mergeable, which the
+PR-state dispatch above routes straight back into gates + review on the next
+invocation — no attempt consumed.
+
+## Landing the PR (Review → out)
+
+A gate-cleared approval lands the PR (auto-merge, squash); a gated one carries
+`human-signoff` and waits for a human (see *Review gates*). Landing is the
+workflow's exit — merged code hands off to **deployment**, which lives in
+`ci-cd.md` and the environments checks, not here.
+
 **Finding gated PRs:** `gh pr list --label human-signoff --state open` in any
 repo. Approve and merge when satisfied; the reviewer's comment-review explains
 what it verified.
 
-## Human parity (solo developer)
+### Human parity (solo developer)
 
 This estate has one developer. The reviewer identity exists to **enable
 automation, never to gate the human out**: every outcome the automation can
@@ -512,6 +645,8 @@ where it already exists and warns; either accept reviewer-approval-then-merge
 as your only path there, or turn it off.
 
 ## Cautions
+
+Three safety properties that span every stage:
 
 - **Prompt injection** — autonomous agents read issue bodies as instructions.
   Restrict who can create/label issues on any repo running unattended agents;
