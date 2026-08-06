@@ -65,6 +65,46 @@ Invariants 1–3 are exactly the three things that make this *look* complicated 
 loops, blocks of work, and one tracker holding many entity types. They aren't
 complications to hide; they're the load-bearing rules.
 
+## This implementation at a glance
+
+The model above is tool-agnostic; here is what *this* estate binds each part to.
+Everything in the right column is a swappable choice — the model doesn't depend
+on any of it.
+
+| Stage / part | This estate's binding |
+|---|---|
+| **Generation** | the **mattpocock-skills** suite — `/triage`, `/grill-me`, `/grill-with-docs`, `/to-spec`, `/to-tickets`, `/wayfinder` — driven by slash command |
+| **Tracking** (substrate) | **GitHub Issues**: labels for entity types + roles, native issue dependencies for the frontier, milestones for blocks |
+| **Execution** | **`scripts/ticket-loop.sh`** (primary) — a thin per-invocation runner. The invariant is *a fresh `claude` instance per ticket*, so any driver that launches those also works: labels + auto-pickup, a session running the runner, Claude agents, or manual CLI |
+| **Per-ticket workflow** | the plugin's model-invocable skills (`/tdd`, `/diagnosing-bugs`, …), selected by a `workflow:<skill>` label |
+| **Review** | the **`ticket-reviewer`** agent, run under a dedicated GitHub **machine account** (PAT in Doppler); a deterministic **review gate** (`standards/review-gates.yaml`) decides landing |
+| **Landing / deployment** | GitHub **auto-merge** (armed by the gate) or a **`human-signoff`** manual merge; deployment proper lives in `ci-cd.md` |
+
+### Anatomy of a `ticket-loop.sh` pass
+
+The runner works one ticket per invocation by launching **passes**. A *pass* is a
+headless `claude -p "<prompt>"` process, run fresh in the ticket's own worktree,
+whose `--allowedTools` is rendered from that pass's verb array — its *capability
+contract* (see *Capability contracts*). There are three:
+
+- **Implement pass** — the execution prompt proper: an eight-step script that
+  reads issue #N *as the spec* → reads `AGENTS.md`/`CONTEXT.md`/ADRs → implements
+  in small atomic commits → validates (tests/lint under `doppler run`) →
+  self-reviews with `/code-review` → pushes and opens a PR (`Closes #N`) →
+  confirms the PR is `MERGEABLE` → and, if genuinely blocked, comments and
+  relabels `ready-for-human` (the escape hatch). One attempt per invocation, up
+  to `MAX_ATTEMPTS`.
+- **Repair pass** — a narrower prompt for a `CONFLICTING` PR: merge the default
+  branch (never rebase or force-push), resolve with `/resolving-merge-conflicts`,
+  re-validate, push. No attempt consumed.
+- **Review pass** — launches the `ticket-reviewer` agent under the reviewer
+  identity and must end with a machine-readable `VERDICT:` line the runner checks
+  against GitHub (see *Verified side effects*).
+
+Which pass runs is decided by *PR-state dispatch* (under *Execution*); it is all
+deterministic shell — the model's invariants live in the runner, never in an
+agent's head.
+
 ## Generation
 
 Generation turns intent into **published, typed work items**. There's more than
