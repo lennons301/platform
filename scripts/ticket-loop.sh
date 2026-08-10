@@ -466,6 +466,11 @@ if [ -n "$RESEARCH" ]; then
 
   # Pre-approve the research pass's capability contract (RESEARCH_VERBS above).
   # Same NB as the other passes: the prompt must come BEFORE --allowedTools.
+  # acceptEdits is kept for symmetry even though the prompt forbids editing the
+  # repo: what keeps a research finding out of the repo is structural, not a
+  # permission mode — the contract carries no git and no PR verbs, so nothing
+  # this pass writes in the worktree can be committed, pushed or opened as a PR.
+  # A scratch file it writes while investigating should not kill the pass.
   RESEARCH_FLAGS=(--permission-mode acceptEdits
     --allowedTools "$(allowed_tools "${RESEARCH_VERBS[@]}")")
   [ -n "$AFK" ] && RESEARCH_FLAGS=(--dangerously-skip-permissions)
