@@ -455,7 +455,7 @@ have — the research analogue of "no open PR after the implement pass" — and 
 reviewer's verdict must be a verdict comment by the reviewer identity matching
 the `VERDICT:` line the pass claimed. Either missing fails the run.
 
-**Two consequences worth knowing:**
+**Three consequences worth knowing:**
 
 - **Still one worktree per ticket.** The research pass runs in the ticket's own
   worktree like any other — it reads the repo, it just never writes to it, so the
