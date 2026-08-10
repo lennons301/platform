@@ -24,18 +24,15 @@ set -uo pipefail
 REVIEW_VERIFY_ATTEMPTS="${REVIEW_VERIFY_ATTEMPTS:-3}"
 REVIEW_VERIFY_SLEEP="${REVIEW_VERIFY_SLEEP:-3}"
 
-# claimed_review_verdict <log-file>
+# verdict_in_text  (reads the text on stdin)
 #   stdout: the normalised verdict — approve | request-changes | comment | escalate
-#   exit:   0 = found, 1 = no recognisable verdict in the log
+#   exit:   0 = found, 1 = no recognisable verdict in the text
 # The LAST `VERDICT: <word>` line wins: the pass relays the reviewer's verdict
 # at the end, after any quoting of the agent definition's own vocabulary.
-claimed_review_verdict() {
-  local log="$1"
-  [ -f "$log" ] || return 1
-
+verdict_in_text() {
   local line word
   # Tolerate markdown around the marker: **VERDICT:** `approve`, ## VERDICT: …
-  line="$(grep -iE 'verdict[^a-z0-9]{0,4}:' "$log" | tail -1 || true)"
+  line="$(grep -iE 'verdict[^a-z0-9]{0,4}:' | tail -1 || true)"
   [ -n "$line" ] || return 1
 
   # Lowercase, drop markdown punctuation, keep the first word after the colon.
@@ -56,6 +53,15 @@ claimed_review_verdict() {
     escalate|escalated|escalation)                      printf 'escalate' ;;
     *) return 1 ;;
   esac
+}
+
+# claimed_review_verdict <log-file>
+#   The verdict the pass claimed, read out of its own teed output.
+#   stdout/exit: as verdict_in_text (a missing log is "no verdict").
+claimed_review_verdict() {
+  local log="$1"
+  [ -f "$log" ] || return 1
+  verdict_in_text < "$log"
 }
 
 # reviewer_review_state <pr> <reviewer-login>
@@ -145,5 +151,123 @@ verify_review_landed() {
   else
     echo "       GitHub shows:  $login $state (reviewDecision: ${decision:-none})" >&2
   fi
+  return 1
+}
+
+# --- Research tickets: the deliverable lives on the issue ----------------------
+# A workflow:research ticket answers a question; its deliverable is the finding,
+# recorded as a comment on the issue that asked — no PR, no diff (see "Research
+# tickets" in choices/ai-dev-workflow.md). The anti-drift guarantee is the same
+# one, so the verification is the same shape one object over: read what the pass
+# claimed, read what GitHub actually holds on the issue, require them to agree.
+
+# issue_comments <issue>
+#   stdout: the issue's comments, oldest first, as a compact JSON array
+#   exit:   0 = read, 2 = the API read itself failed (never "no comments")
+issue_comments() {
+  local json
+  json="$(gh issue view "$1" --comments --json comments 2>/dev/null)" || return 2
+  [ -n "$json" ] || return 2
+  printf '%s' "$json" | jq -c '.comments // []' 2>/dev/null || return 2
+}
+
+# reviewer_issue_verdict <issue> <reviewer-login>
+#   stdout: the verdict in the reviewer identity's latest verdict comment on the
+#           issue, or "" if it has posted none
+#   exit:   0 = read, 2 = the API read itself failed (never "no verdict")
+# Latest *verdict* comment, not latest comment: the reviewer may leave notes
+# beside its verdict, and a re-reviewed ticket still carries the earlier runs'
+# verdicts — so the reviewer's comments are read in order and the last one that
+# parses wins, exactly as the last VERDICT line of a pass's output does.
+# Logins are compared case-insensitively — GitHub treats them that way.
+reviewer_issue_verdict() {
+  local issue="$1" login="$2" text
+  text="$(issue_comments "$issue" | jq -r --arg login "$login" '
+    .[] | select((.author.login // "" | ascii_downcase) == ($login | ascii_downcase))
+        | .body // ""')" || return 2
+  [ -n "$text" ] || return 0
+  printf '%s\n' "$text" | verdict_in_text || return 0
+}
+
+# verify_issue_verdict_landed <issue> <reviewer-login> <log-file>
+#   Diagnosis on stdout (mismatch detail on stderr).
+#   exit: 0 = the claimed verdict is on the issue as a comment by <reviewer-login>
+#         1 = mismatch — claim and GitHub disagree
+#         2 = unverifiable — no machine-readable verdict, or the API read failed
+# Unlike the PR path, every verdict here is the same kind of side effect (an
+# issue comment ending in the VERDICT line), escalation included — so there is
+# no per-verdict exception: the posted verdict must equal the claimed one.
+verify_issue_verdict_landed() {
+  local issue="$1" login="$2" log="$3"
+
+  local verdict
+  if ! verdict="$(claimed_review_verdict "$log")"; then
+    echo "ERROR: the review pass emitted no machine-readable 'VERDICT: <approve|request-changes|comment|escalate>' line," >&2
+    echo "       so what it recorded on issue #$issue cannot be verified. Treating an unverifiable review as a failure." >&2
+    return 2
+  fi
+
+  # Retried like the PR path, and for the same reason: a comment posted seconds
+  # ago can read back stale, and falsely failing a real review is as wrong as
+  # passing a phantom one.
+  local try posted=""
+  for (( try = 1; try <= REVIEW_VERIFY_ATTEMPTS; try++ )); do
+    if posted="$(reviewer_issue_verdict "$issue" "$login")"; then
+      if [ "$posted" = "$verdict" ]; then
+        echo "Verified: review pass claimed '$verdict' and $login posted a matching verdict comment on issue #$issue."
+        return 0
+      fi
+    elif [ "$try" -eq "$REVIEW_VERIFY_ATTEMPTS" ]; then
+      echo "ERROR: could not read the comments on issue #$issue (gh issue view --comments --json comments failed)." >&2
+      echo "       The review pass claimed '$verdict'; that claim stays unverified." >&2
+      return 2
+    fi
+    if [ "$try" -lt "$REVIEW_VERIFY_ATTEMPTS" ]; then sleep "$REVIEW_VERIFY_SLEEP"; fi
+  done
+
+  echo "ERROR: review pass claim and GitHub disagree on issue #$issue — the pass's narration is not evidence." >&2
+  echo "       pass claimed:  $verdict (expected a '$verdict' verdict comment by $login)" >&2
+  if [ -z "$posted" ]; then
+    echo "       GitHub shows:  no verdict comment by $login on the issue at all" >&2
+  else
+    echo "       GitHub shows:  $login posted '$posted'" >&2
+  fi
+  return 1
+}
+
+# issue_finding_count <issue>
+#   stdout: how many of the issue's comments are content rather than the
+#           runner's own bookkeeping markers (🤖 attempts and flags, 🔧 repairs)
+#   exit:   0 = read, 2 = the API read itself failed
+issue_finding_count() {
+  local comments
+  comments="$(issue_comments "$1")" || return 2
+  printf '%s' "$comments" \
+    | jq -r '[.[] | select(((.body // "") | test("^\\s*(🤖|🔧)")) | not)] | length' \
+        2>/dev/null || return 2
+}
+
+# verify_finding_landed <issue> <baseline-count>
+#   The research analogue of "no open PR for $BRANCH after the implement pass":
+#   the deliverable is a comment, so require one that was not there before the
+#   pass ran (count taken with issue_finding_count beforehand).
+#   exit: 0 = a new comment is on the issue, 1 = none, 2 = unverifiable
+verify_finding_landed() {
+  local issue="$1" baseline="$2" try count=""
+  for (( try = 1; try <= REVIEW_VERIFY_ATTEMPTS; try++ )); do
+    if count="$(issue_finding_count "$issue")"; then
+      if [ "$count" -gt "$baseline" ]; then
+        echo "Verified: the pass recorded $((count - baseline)) new comment(s) on issue #$issue."
+        return 0
+      fi
+    elif [ "$try" -eq "$REVIEW_VERIFY_ATTEMPTS" ]; then
+      echo "ERROR: could not read the comments on issue #$issue (gh issue view --comments --json comments failed)," >&2
+      echo "       so whether the pass recorded its finding cannot be verified." >&2
+      return 2
+    fi
+    if [ "$try" -lt "$REVIEW_VERIFY_ATTEMPTS" ]; then sleep "$REVIEW_VERIFY_SLEEP"; fi
+  done
+  echo "ERROR: the pass recorded nothing new on issue #$issue — a research ticket's deliverable IS the comment," >&2
+  echo "       and the issue holds no comment it did not already have ($baseline before, $count now)." >&2
   return 1
 }

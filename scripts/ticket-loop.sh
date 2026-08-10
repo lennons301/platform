@@ -10,6 +10,12 @@
 #   -> review pass (fresh context, reviewer identity) -> verify the review
 #   actually landed on GitHub -> report.
 #
+# A `workflow:research` ticket takes a second route through the same guarantees
+# (see "Research tickets" below): its deliverable is a finding recorded on the
+# issue that asked the question, so there is no PR — research pass (finding
+# posted as an issue comment) -> review pass against the issue thread, verdict
+# posted as a comment -> verify it landed -> approve closes the issue.
+#
 # The review pass runs as the reviewer machine account (PAT fetched from
 # Doppler), so its approvals are accepted by GitHub. Whether an approval may
 # auto-land the PR is decided deterministically BEFORE review: changed paths
@@ -101,14 +107,28 @@ IMPLEMENT_VERBS=(
   "doppler run"
 )
 
+# Research pass (prompt in the research section below): the workflow:research
+# variant of the implement pass. Its deliverable is a finding recorded on the
+# issue, so it carries the issue verbs and nothing else — no git, no PR verbs:
+# a research ticket produces no commit, no branch push and no PR by design.
+RESEARCH_VERBS=(
+  "gh issue view"
+  "gh issue comment"
+  "gh issue edit"
+  "doppler run"
+)
+
 # Review pass: the ticket-reviewer agent's contract (canonical at
 # templates/agents/ticket-reviewer.md): read the ticket and PR (view, diff,
 # CI checks), submit the verdict (approve / request-changes / comment),
 # the human-signoff path (disarm auto-merge + label), and the escalation
 # path (PR comment + relabel the issue). `gh pr merge` is carried only with
 # --disable-auto — the reviewer may add a human gate, never merge.
+# `gh issue comment` is for the agent's issue-thread mode: on a research
+# ticket the verdict is posted on the issue, there being no PR to review.
 REVIEW_VERBS=(
   "gh issue view"
+  "gh issue comment"
   "gh issue edit"
   "gh pr view"
   "gh pr diff"
@@ -158,7 +178,8 @@ command -v jq > /dev/null || { echo "ERROR: jq is required." >&2; exit 1; }
 if [ -n "$AFK" ]; then
   PREFLIGHT_VERBS=("${REVIEW_VERBS[@]}")
 else
-  PREFLIGHT_VERBS=("${IMPLEMENT_VERBS[@]}" "${REPAIR_VERBS[@]}" "${REVIEW_VERBS[@]}")
+  PREFLIGHT_VERBS=("${IMPLEMENT_VERBS[@]}" "${REPAIR_VERBS[@]}"
+                   "${RESEARCH_VERBS[@]}" "${REVIEW_VERBS[@]}")
 fi
 BLOCKING=""
 for SETTINGS in "$HOME/.claude/settings.json" \
@@ -222,15 +243,35 @@ if [ -z "$ISSUE" ]; then
   fi
 fi
 
-# Explicit --issue bypasses the pick above, so guard it here too — loudly, since
-# naming a wayfinder ticket directly is a mistake rather than a quiet skip.
-if gh issue view "$ISSUE" --json labels \
-    --jq '[.labels[].name | startswith("wayfinder:")] | any' | grep -q true; then
-  echo "==> ERROR: issue #$ISSUE is a wayfinder ticket (wayfinder:* label)." >&2
-  echo "    Wayfinder tickets resolve decisions, not code — work it with /wayfinder." >&2
-  echo "    See 'The generation flow' (Wayfinder) in choices/ai-dev-workflow.md." >&2
+# The ticket's labels decide two things below: whether this loop refuses the
+# ticket outright (wayfinder), and what shape its deliverable has (a research
+# ticket answers a question on the issue instead of opening a PR). Read them
+# once, and fail rather than proceed label-blind — an unreadable label set would
+# silently look like "no wayfinder label, not research".
+if ! LABEL_LIST="$(gh issue view "$ISSUE" --json labels --jq '.labels[].name')"; then
+  echo "==> ERROR: could not read the labels on issue #$ISSUE." >&2
   exit 1
 fi
+mapfile -t LABELS <<< "$LABEL_LIST"
+has_label() {
+  local want="$1" label
+  for label in ${LABELS[@]+"${LABELS[@]}"}; do
+    [ "$label" = "$want" ] && return 0
+  done
+  return 1
+}
+
+# Explicit --issue bypasses the pick above, so guard it here too — loudly, since
+# naming a wayfinder ticket directly is a mistake rather than a quiet skip.
+for LABEL in ${LABELS[@]+"${LABELS[@]}"}; do
+  case "$LABEL" in
+    wayfinder:*)
+      echo "==> ERROR: issue #$ISSUE is a wayfinder ticket ($LABEL)." >&2
+      echo "    Wayfinder tickets resolve decisions, not code — work it with /wayfinder." >&2
+      echo "    See 'The generation flow' (Wayfinder) in choices/ai-dev-workflow.md." >&2
+      exit 1 ;;
+  esac
+done
 
 # Same for blockers: a quiet skip is right for the auto-pick, but naming a
 # blocked ticket directly is a mistake worth stopping on.
@@ -243,6 +284,17 @@ if is_blocked "$ISSUE"; then
 fi
 
 echo "==> Issue #$ISSUE in $REPO_NAME"
+
+# A workflow:research ticket is a knowledge ticket: it asks a question, and its
+# deliverable is the finding that answers it — recorded on the issue that asked,
+# where the question and its answer stay together. Nothing about it is
+# PR-shaped, so the whole PR half of this runner (dispatch, mergeability, gates,
+# auto-merge, diff review) is skipped for one: see the research section below.
+RESEARCH=""
+if has_label "workflow:research"; then
+  RESEARCH="1"
+  echo "==> workflow:research ticket — the finding is recorded on the issue; no PR, no gates."
+fi
 
 BRANCH="agent/issue-$ISSUE"
 DEFAULT_BRANCH="$(gh repo view --json defaultBranchRef --jq .defaultBranchRef.name)"
@@ -282,7 +334,9 @@ pr_merge_state() {
 }
 
 MODE="implement"
-PR="$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number // empty')"
+PR=""
+# Research tickets have no PR to dispatch on, by design — skip the read entirely.
+[ -z "$RESEARCH" ] && PR="$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number // empty')"
 if [ -n "$PR" ]; then
   MERGE_STATE="$(pr_merge_state "$PR")"
   REVIEW_DECISION="$(gh pr view "$PR" --json reviewDecision --jq '.reviewDecision // ""')"
@@ -316,7 +370,11 @@ if [ "$MODE" = "implement" ]; then
     # sunset projectCards field and error out (observed 2026-07-28, gh 2.45).
     gh api "repos/{owner}/{repo}/issues/$ISSUE/labels" -f 'labels[]=ready-for-human' > /dev/null
     gh api -X DELETE "repos/{owner}/{repo}/issues/$ISSUE/labels/ready-for-agent" > /dev/null || true
-    gh issue comment "$ISSUE" --body "🤖 $((ATTEMPT - 1)) agent attempts without an approved PR — flagging ready-for-human."
+    # What "no result" means depends on the ticket's deliverable: a research
+    # ticket never had a PR to get approved (see the research section below).
+    EXHAUSTED_WITHOUT="an approved PR"
+    [ -n "$RESEARCH" ] && EXHAUSTED_WITHOUT="an approved finding"
+    gh issue comment "$ISSUE" --body "🤖 $((ATTEMPT - 1)) agent attempts without $EXHAUSTED_WITHOUT — flagging ready-for-human."
     exit 1
   fi
   gh issue comment "$ISSUE" --body "🤖 Attempt $ATTEMPT/$MAX_ATTEMPTS starting." > /dev/null
@@ -340,6 +398,190 @@ if [ ! -d "$WORKTREE" ]; then
   fi
 fi
 echo "==> Worktree: $WORKTREE"
+
+# --- Reviewer identity -------------------------------------------------------
+# Both review paths (PR diff, research issue thread) run as the reviewer machine
+# account, so both resolve it the same way: PAT out of Doppler, confirmed live
+# and confirmed to be someone other than the implementer. Sets REVIEWER_TOKEN
+# and REVIEWER_ACTUAL; exits non-zero rather than reviewing under the wrong
+# identity. Called from the review sections, so the token is exported only
+# around a review pass — an implement pass never sees it.
+
+resolve_reviewer_identity() {
+  if ! command -v doppler > /dev/null 2>&1; then
+    echo "==> ERROR: doppler CLI not found. The review pass authenticates via a PAT in Doppler." >&2
+    echo "    Bootstrap this machine: install doppler, then 'doppler login'. See $ONBOARDING_DOC." >&2
+    exit 1
+  fi
+
+  if ! REVIEWER_TOKEN="$(doppler secrets get "$REVIEWER_DOPPLER_SECRET" \
+      --project "$REVIEWER_DOPPLER_PROJECT" --config "$REVIEWER_DOPPLER_CONFIG" \
+      --plain 2>/dev/null)" || [ -z "$REVIEWER_TOKEN" ]; then
+    echo "==> ERROR: could not read $REVIEWER_DOPPLER_SECRET from Doppler ($REVIEWER_DOPPLER_PROJECT/$REVIEWER_DOPPLER_CONFIG)." >&2
+    echo "    Is this machine logged in (doppler login)? Has the reviewer PAT been minted and stored? See $ONBOARDING_DOC." >&2
+    exit 1
+  fi
+
+  REVIEWER_ACTUAL="$(GH_TOKEN="$REVIEWER_TOKEN" gh api user --jq .login 2>/dev/null || true)"
+  if [ -z "$REVIEWER_ACTUAL" ]; then
+    echo "==> ERROR: reviewer PAT was rejected by GitHub (expired or revoked?). See $ONBOARDING_DOC." >&2
+    exit 1
+  fi
+  IMPLEMENTER="$(gh api user --jq .login)"
+  if [ "$REVIEWER_ACTUAL" = "$IMPLEMENTER" ]; then
+    echo "==> ERROR: reviewer token belongs to '$REVIEWER_ACTUAL' — same identity as the implementer." >&2
+    echo "    GitHub rejects self-approval; store the machine account's PAT instead. See $ONBOARDING_DOC." >&2
+    exit 1
+  fi
+}
+
+# --- Research tickets: finding on the issue, reviewed on the issue ------------
+# The whole path for a workflow:research ticket, and it ends in an exit: the PR
+# machinery below (mergeability, gates, auto-merge, diff review) has no object
+# to act on here, so the ticket never reaches it — which is also why the PR path
+# needs no research conditionals at all.
+#
+# What the loop guarantees is unchanged: one bounded attempt against the ticket
+# as spec, a fresh-eyes review under a separate identity, and side effects
+# verified against GitHub rather than taken from a pass's narration. Only the
+# object those guarantees apply to changes — an issue comment, not a diff. The
+# question and its answer end up on the same issue, and nothing lands in the
+# repo: a research finding that leaves an artefact behind answered in the wrong
+# shape (interlude#59, 2026-08-06 — the finding was right, the merged
+# docs/research/*.md was not).
+
+if [ -n "$RESEARCH" ]; then
+  # Baseline first: "the pass recorded its finding" means a comment the issue
+  # did not already have — earlier attempts and reviewer verdicts are already
+  # there. Runner markers (🤖 / 🔧) are excluded from both reads.
+  set +e
+  FINDING_BASELINE="$(issue_finding_count "$ISSUE")"
+  BASELINE_RC=$?
+  set -e
+  if [ "$BASELINE_RC" -ne 0 ]; then
+    echo "==> ERROR: could not read the comments on issue #$ISSUE before the research pass." >&2
+    echo "    Without a baseline, a finding that landed cannot be told from one already there. Re-run." >&2
+    exit 1
+  fi
+
+  # Pre-approve the research pass's capability contract (RESEARCH_VERBS above).
+  # Same NB as the other passes: the prompt must come BEFORE --allowedTools.
+  # acceptEdits is kept for symmetry even though the prompt forbids editing the
+  # repo: what keeps a research finding out of the repo is structural, not a
+  # permission mode — the contract carries no git and no PR verbs, so nothing
+  # this pass writes in the worktree can be committed, pushed or opened as a PR.
+  # A scratch file it writes while investigating should not kill the pass.
+  RESEARCH_FLAGS=(--permission-mode acceptEdits
+    --allowedTools "$(allowed_tools "${RESEARCH_VERBS[@]}")")
+  [ -n "$AFK" ] && RESEARCH_FLAGS=(--dangerously-skip-permissions)
+
+  (cd "$WORKTREE" && claude -p "
+Answer the research question in GitHub issue #$ISSUE of this repo. This is
+attempt $ATTEMPT of $MAX_ATTEMPTS.
+
+This is a research ticket (workflow:research): the deliverable is the finding
+itself, recorded on the issue that asks the question. Do NOT write code, do NOT
+add or edit any file in this repo, and do NOT open a PR — a finding that leaves
+an artefact behind is the wrong shape of answer.
+
+1. Read the issue in full (gh issue view $ISSUE --comments). The question, and
+   any acceptance criteria it sets for the answer, are the spec. Read the
+   existing comments too: on a repeat attempt the reviewer's verdict says what
+   was missing, and that is what this attempt must fix.
+2. Investigate with the /research skill. Primary sources first: this repo's own
+   code and docs, AGENTS.md / CLAUDE.md and CONTEXT.md for how it is meant to
+   work, upstream sources, and experiments you can actually run. Keep what you
+   verified separate from what you inferred.
+3. This pass is permitted the issue verbs (gh issue view / comment / edit) and
+   'doppler run'; anything else depends on what this repo's own permission
+   settings already allow. If a check you need is not permitted, say so in the
+   finding — an unrun experiment reported as a result is the one outcome worse
+   than a gap.
+4. Post the finding as a comment on the issue (gh issue comment $ISSUE): the
+   answer to the question first, then the evidence for it (what you ran or read,
+   with sources specific enough for the reviewer to check without repeating the
+   investigation), then what it changes and what it leaves open. If the honest
+   answer is 'it depends' or 'no', say that — a research ticket is not obliged
+   to produce a yes.
+5. If the question cannot be answered as asked (it needs a decision only a human
+   can make, or access you do not have), say exactly that in the comment, label
+   issue #$ISSUE ready-for-human, and stop.
+" "${RESEARCH_FLAGS[@]}")
+
+  # The runner is the guarantor here too: the finding is the deliverable, so a
+  # pass that narrated one but posted nothing fails the run — the research
+  # analogue of "no open PR for $BRANCH after the implement pass".
+  set +e
+  verify_finding_landed "$ISSUE" "$FINDING_BASELINE"
+  FINDING_RC=$?
+  set -e
+  if [ "$FINDING_RC" -ne 0 ]; then
+    echo "==> No finding recorded on issue #$ISSUE by the research pass (see above)." >&2
+    echo "    Nothing to review; the attempt is spent. See the issue for what the pass said." >&2
+    exit 1
+  fi
+
+  # The escape hatch posts a comment too, so the check above cannot tell it from
+  # a finding — the relabel can. A ticket handed back to a human is not reviewed.
+  if [ -n "$(gh issue view "$ISSUE" --json labels \
+              --jq '.labels[] | select(.name == "ready-for-human") | .name')" ]; then
+    echo "==> Issue #$ISSUE is now labelled ready-for-human — the research pass handed it back." >&2
+    echo "    Not reviewing a question it says needs a human. See the issue." >&2
+    exit 1
+  fi
+
+  resolve_reviewer_identity
+
+  REVIEW_LOG="$(mktemp)"   # the review pass's own output — see the verification below
+  trap 'rm -f "$REVIEW_LOG"' EXIT
+
+  echo "==> Reviewing the finding on issue #$ISSUE as $REVIEWER_ACTUAL"
+  (cd "$WORKTREE" && GH_TOKEN="$REVIEWER_TOKEN" claude -p "
+Launch the ticket-reviewer agent to review the research finding recorded on
+issue #$ISSUE of this repo, then relay its verdict verbatim.
+
+Context for the reviewer: this is a research ticket (workflow:research), so it
+reviews in issue-thread mode — see 'Issue-thread mode (research tickets)' in its
+own definition. There is no PR and no diff: what is under review is the finding
+comment on the issue (gh issue view $ISSUE --comments), judged against the
+question the issue asks. It posts its verdict as a comment on the issue
+(gh issue comment $ISSUE), not as a PR review, and nothing merges — an approval
+means the question is answered, and the runner then closes the issue.
+
+End your output with the machine-readable verdict on its own final line —
+exactly 'VERDICT: approve' (the question is answered and the evidence holds),
+'VERDICT: request-changes' (gaps — name them), 'VERDICT: comment' (recommend a
+human looks), or 'VERDICT: escalate'. The runner reads that line and checks the
+issue for the reviewer's matching verdict comment before reporting success: a
+verdict you narrate but never post with gh issue comment fails this run.
+" --allowedTools "$(allowed_tools "${REVIEW_VERBS[@]}")") 2>&1 | tee "$REVIEW_LOG"
+
+  set +e
+  verify_issue_verdict_landed "$ISSUE" "$REVIEWER_ACTUAL" "$REVIEW_LOG"
+  VERIFY_RC=$?
+  set -e
+  if [ "$VERIFY_RC" -ne 0 ]; then
+    echo "==> ERROR: the review pass's verdict is not on issue #$ISSUE as a comment by $REVIEWER_ACTUAL (see above)." >&2
+    echo "    Not reporting success on a review GitHub has no record of. A re-run works the ticket" >&2
+    echo "    again from the top — there is no PR to dispatch on, so it re-investigates and spends" >&2
+    echo "    another attempt." >&2
+    exit 1
+  fi
+
+  VERDICT="$(claimed_review_verdict "$REVIEW_LOG")"
+  if [ "$VERDICT" = "approve" ]; then
+    # Closing is this path's 'landing the PR', and the runner does it for the
+    # same reason it arms auto-merge rather than letting a pass merge: the
+    # question is answered, so the ticket is done. REST, not gh issue close —
+    # see the projectCards note above.
+    gh api -X PATCH "repos/{owner}/{repo}/issues/$ISSUE" \
+      -f state=closed -f state_reason=completed > /dev/null
+    echo "==> Done. Issue #$ISSUE — finding recorded and approved by $REVIEWER_ACTUAL; issue closed (attempt $ATTEMPT)."
+  else
+    echo "==> Done. Issue #$ISSUE stays open — reviewer verdict '$VERDICT' on attempt $ATTEMPT/$MAX_ATTEMPTS."
+  fi
+  exit 0
+fi
 
 # --- Implement pass ----------------------------------------------------------
 # Fresh claude process, fresh context. The ticket is the spec.
@@ -510,31 +752,7 @@ fi
 # escalates; it never edits code. Its PAT comes from Doppler and is exported
 # only around this pass — the implement pass never sees it.
 
-if ! command -v doppler > /dev/null 2>&1; then
-  echo "==> ERROR: doppler CLI not found. The review pass authenticates via a PAT in Doppler." >&2
-  echo "    Bootstrap this machine: install doppler, then 'doppler login'. See $ONBOARDING_DOC." >&2
-  exit 1
-fi
-
-if ! REVIEWER_TOKEN="$(doppler secrets get "$REVIEWER_DOPPLER_SECRET" \
-    --project "$REVIEWER_DOPPLER_PROJECT" --config "$REVIEWER_DOPPLER_CONFIG" \
-    --plain 2>/dev/null)" || [ -z "$REVIEWER_TOKEN" ]; then
-  echo "==> ERROR: could not read $REVIEWER_DOPPLER_SECRET from Doppler ($REVIEWER_DOPPLER_PROJECT/$REVIEWER_DOPPLER_CONFIG)." >&2
-  echo "    Is this machine logged in (doppler login)? Has the reviewer PAT been minted and stored? See $ONBOARDING_DOC." >&2
-  exit 1
-fi
-
-REVIEWER_ACTUAL="$(GH_TOKEN="$REVIEWER_TOKEN" gh api user --jq .login 2>/dev/null || true)"
-if [ -z "$REVIEWER_ACTUAL" ]; then
-  echo "==> ERROR: reviewer PAT was rejected by GitHub (expired or revoked?). See $ONBOARDING_DOC." >&2
-  exit 1
-fi
-IMPLEMENTER="$(gh api user --jq .login)"
-if [ "$REVIEWER_ACTUAL" = "$IMPLEMENTER" ]; then
-  echo "==> ERROR: reviewer token belongs to '$REVIEWER_ACTUAL' — same identity as the implementer." >&2
-  echo "    GitHub rejects self-approval; store the machine account's PAT instead. See $ONBOARDING_DOC." >&2
-  exit 1
-fi
+resolve_reviewer_identity
 
 echo "==> Reviewing PR #$PR as $REVIEWER_ACTUAL"
 # Pre-approve the reviewer's capability contract (REVIEW_VERBS above). Same

@@ -89,7 +89,7 @@ docs/                — presentations and design specs
   onboarding" in `choices/ai-dev-workflow.md`
 - Each headless ticket-loop pass pre-approves exactly the command verbs its
   prompt (or the ticket-reviewer agent definition) instructs, rendered from
-  the `IMPLEMENT_VERBS`/`REPAIR_VERBS`/`REVIEW_VERBS` arrays in
+  the `IMPLEMENT_VERBS`/`REPAIR_VERBS`/`RESEARCH_VERBS`/`REVIEW_VERBS` arrays in
   `scripts/ticket-loop.sh` that also feed the permission preflight — changing
   a pass prompt or `templates/agents/ticket-reviewer.md` means updating the
   matching array (see "Capability contracts" in `choices/ai-dev-workflow.md`)
@@ -108,6 +108,11 @@ docs/                — presentations and design specs
 - Per-ticket workflows are selected by a `workflow:<skill>` label whose name is
   the mattpocock skill name (`workflow:tdd` → `/tdd`) — no menu files exist by
   design; the model-invocable skills are the menu
+- `workflow:research` tickets take a second route through `scripts/ticket-loop.sh`:
+  the finding is posted as an issue comment (no repo edit, no PR, no gates), the
+  reviewer reviews the issue thread and posts its verdict there, the runner
+  verifies that comment landed, and an `approve` closes the issue (see "Research
+  tickets" in `choices/ai-dev-workflow.md`)
 - `wayfinder:*` issues are decision tickets and are refused by
   `scripts/ticket-loop.sh` — filtered from the auto-pick, an error via `--issue`
 - Estate-wide GitHub automation is published from this repo as a `workflow_call`

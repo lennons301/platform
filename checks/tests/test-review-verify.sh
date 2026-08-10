@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# Test scripts/review-verify-lib.sh: the runner's post-review check that the
-# review pass's claimed verdict actually landed on the PR as a review by the
-# reviewer identity. gh is stubbed; no network.
+# Test scripts/review-verify-lib.sh: the runner's post-pass checks that a pass's
+# side effect actually landed — the claimed verdict as a review by the reviewer
+# identity on the PR, and, for workflow:research tickets, the finding and the
+# verdict as comments on the issue. gh is stubbed; no network.
 cd "$(dirname "$0")" || exit 1
 source ./helpers.sh
 # No sleeping in tests; the retry itself is exercised explicitly below.
@@ -13,19 +14,28 @@ trap 'rm -rf "$TMPDIR"' EXIT
 
 # --- fake gh -----------------------------------------------------------------
 # GH_STUB_PR_JSON is the body `gh pr view --json reviewDecision,latestReviews`
-# returns; GH_STUB_FAIL=yes makes every read fail the way a dead token does.
-# The _FIRST variants answer only the first call, so retry behaviour (a review
-# that reads stale for a moment) is testable. Every call is counted.
+# returns, GH_STUB_ISSUE_JSON the body `gh issue view --comments --json comments`
+# returns (the stub routes on the `pr`/`issue` subcommand); GH_STUB_FAIL=yes
+# makes every read fail the way a dead token does. The _FIRST variants answer
+# only the first call, so retry behaviour (a review that reads stale for a
+# moment) is testable. Every call is counted.
 mkdir -p "$TMPDIR/bin"
 cat > "$TMPDIR/bin/gh" <<'MOCK'
 #!/usr/bin/env bash
 N=$(( $(cat "$GH_STUB_COUNT" 2>/dev/null || echo 0) + 1 ))
 echo "$N" > "$GH_STUB_COUNT"
-[ "${GH_STUB_FAIL:-}" = "yes" ] && { echo "gh: could not read PR (HTTP 401)" >&2; exit 1; }
+[ "${GH_STUB_FAIL:-}" = "yes" ] && { echo "gh: could not read (HTTP 401)" >&2; exit 1; }
+KIND=pr
+[ "${1:-}" = "issue" ] && KIND=issue
 if [ "$N" = "1" ]; then
   [ "${GH_STUB_FAIL_FIRST:-}" = "yes" ] && { echo "gh: upstream timeout (HTTP 502)" >&2; exit 1; }
-  [ -n "${GH_STUB_PR_JSON_FIRST:-}" ] && { printf '%s' "$GH_STUB_PR_JSON_FIRST"; exit 0; }
+  if [ "$KIND" = "issue" ]; then
+    [ -n "${GH_STUB_ISSUE_JSON_FIRST:-}" ] && { printf '%s' "$GH_STUB_ISSUE_JSON_FIRST"; exit 0; }
+  else
+    [ -n "${GH_STUB_PR_JSON_FIRST:-}" ] && { printf '%s' "$GH_STUB_PR_JSON_FIRST"; exit 0; }
+  fi
 fi
+[ "$KIND" = "issue" ] && { printf '%s' "${GH_STUB_ISSUE_JSON:-}"; exit 0; }
 printf '%s' "${GH_STUB_PR_JSON:-}"
 MOCK
 chmod +x "$TMPDIR/bin/gh"
@@ -181,5 +191,125 @@ GH_STUB_PR_JSON="$NO_REVIEWS" verify_review_landed 99 "$REVIEWER" \
 assert_eq "REVIEW_VERIFY_ATTEMPTS=1 fails on the first look" "1" "$?"
 assert_eq "and reads GitHub exactly once" "1" "$(gh_calls)"
 REVIEW_VERIFY_ATTEMPTS=3
+
+# --- research tickets: the finding and its review live on the issue -----------
+# Same anti-drift guarantee, one object over: the reviewer posts its verdict as
+# an issue comment, and the runner reads it back off the issue.
+
+# issue_json <login>:<body> ... -> the body `gh issue view --comments --json
+# comments` returns, comments oldest first.
+issue_json() {
+  local spec out=""
+  for spec in "$@"; do
+    out+="${out:+,}$(jq -nc --arg login "${spec%%:*}" --arg body "${spec#*:}" \
+      '{author: {login: $login}, body: $body}')"
+  done
+  printf '{"comments":[%s]}' "$out"
+}
+
+IMPLEMENTER="lennons301"
+FINDING="Finding: stream-json input does not expand slash commands."
+
+APPROVED_THREAD="$(issue_json "$IMPLEMENTER:🤖 Attempt 1/3 starting." \
+                              "$IMPLEMENTER:$FINDING" \
+                              "$REVIEWER:Checked the sources cited.
+VERDICT: approve")"
+NO_VERDICT_THREAD="$(issue_json "$IMPLEMENTER:🤖 Attempt 1/3 starting." \
+                                "$IMPLEMENTER:$FINDING")"
+
+# --- whose verdict, and which one ---------------------------------------------
+
+assert_eq "the reviewer's verdict comment is found" "approve" \
+  "$(GH_STUB_ISSUE_JSON="$APPROVED_THREAD" reviewer_issue_verdict 59 "$REVIEWER")"
+assert_eq "no reviewer comment means no verdict" "" \
+  "$(GH_STUB_ISSUE_JSON="$NO_VERDICT_THREAD" reviewer_issue_verdict 59 "$REVIEWER")"
+assert_eq "a verdict by another author does not count" "" \
+  "$(GH_STUB_ISSUE_JSON="$(issue_json "$IMPLEMENTER:VERDICT: approve")" \
+     reviewer_issue_verdict 59 "$REVIEWER")"
+assert_eq "the reviewer's latest verdict wins over an earlier run's" "approve" \
+  "$(GH_STUB_ISSUE_JSON="$(issue_json "$REVIEWER:VERDICT: request-changes" \
+                                      "$IMPLEMENTER:$FINDING (revised)" \
+                                      "$REVIEWER:VERDICT: approve")" \
+     reviewer_issue_verdict 59 "$REVIEWER")"
+assert_eq "a reviewer comment with no verdict line reads as none" "" \
+  "$(GH_STUB_ISSUE_JSON="$(issue_json "$REVIEWER:Reading the thread now.")" \
+     reviewer_issue_verdict 59 "$REVIEWER")"
+assert_eq "issue-thread login comparison is case-insensitive" "approve" \
+  "$(GH_STUB_ISSUE_JSON="$(issue_json "LENNONS301-Reviewer:VERDICT: approve")" \
+     reviewer_issue_verdict 59 "$REVIEWER")"
+
+# verify_issue <issue-json> <log-path> -> combined output; sets STATUS
+verify_issue() {
+  : > "$GH_STUB_COUNT"
+  OUTPUT=$(GH_STUB_ISSUE_JSON="$1" verify_issue_verdict_landed 59 "$REVIEWER" "$2" 2>&1)
+  STATUS=$?
+}
+
+verify_issue "$APPROVED_THREAD" "$(log 'VERDICT: approve')"
+assert_eq "claimed approve + a matching verdict comment passes" "0" "$STATUS"
+assert_eq "reports the verified side effect" "1" \
+  "$(echo "$OUTPUT" | grep -c "posted a matching verdict comment on issue #59")"
+
+verify_issue "$NO_VERDICT_THREAD" "$(log 'VERDICT: approve' 'Posted my verdict on the issue.')"
+assert_eq "claimed approve + nothing posted fails" "1" "$STATUS"
+assert_eq "names what GitHub shows" "1" \
+  "$(echo "$OUTPUT" | grep -c "no verdict comment by $REVIEWER")"
+
+verify_issue "$(issue_json "$REVIEWER:VERDICT: request-changes")" "$(log 'VERDICT: approve')"
+assert_eq "claimed approve + a request-changes comment fails" "1" "$STATUS"
+assert_eq "names the verdict actually posted" "1" \
+  "$(echo "$OUTPUT" | grep -c "posted 'request-changes'")"
+
+verify_issue "$(issue_json "$REVIEWER:VERDICT: escalate")" "$(log 'VERDICT: escalate')"
+assert_eq "claimed escalate + an escalation comment passes" "0" "$STATUS"
+
+verify_issue "$(issue_json "$REVIEWER:VERDICT: approve")" "$(log 'VERDICT: escalate')"
+assert_eq "claimed escalate + an approval comment fails" "1" "$STATUS"
+
+verify_issue "$APPROVED_THREAD" "$(log 'The finding answers the question.')"
+assert_eq "no machine-readable verdict is unverifiable (exit 2)" "2" "$STATUS"
+
+: > "$GH_STUB_COUNT"
+OUTPUT=$(GH_STUB_FAIL=yes verify_issue_verdict_landed 59 "$REVIEWER" \
+  "$(log 'VERDICT: approve')" 2>&1)
+assert_eq "a failed issue read is unverifiable, not a pass (exit 2)" "2" "$?"
+assert_eq "says the claim stays unverified" "1" \
+  "$(echo "$OUTPUT" | grep -c "stays unverified")"
+
+: > "$GH_STUB_COUNT"
+GH_STUB_ISSUE_JSON_FIRST="$NO_VERDICT_THREAD" GH_STUB_ISSUE_JSON="$APPROVED_THREAD" \
+  verify_issue_verdict_landed 59 "$REVIEWER" "$(log 'VERDICT: approve')" > /dev/null 2>&1
+assert_eq "a comment that reads stale on the first look still verifies" "0" "$?"
+assert_eq "and it took a second read to see it" "2" "$(gh_calls)"
+
+# --- the finding itself: the research analogue of "no PR after the pass" ------
+
+assert_eq "runner markers are not findings" "0" \
+  "$(GH_STUB_ISSUE_JSON="$(issue_json "$IMPLEMENTER:🤖 Attempt 1/3 starting." \
+                                      "$IMPLEMENTER:🔧 Repair pass starting.")" \
+     issue_finding_count 59)"
+assert_eq "comments that are not markers are findings" "2" \
+  "$(GH_STUB_ISSUE_JSON="$APPROVED_THREAD" issue_finding_count 59)"
+
+: > "$GH_STUB_COUNT"
+OUTPUT=$(GH_STUB_ISSUE_JSON="$NO_VERDICT_THREAD" verify_finding_landed 59 0 2>&1)
+assert_eq "a finding posted where there was none passes" "0" "$?"
+assert_eq "reports what landed" "1" "$(echo "$OUTPUT" | grep -c "recorded 1 new comment")"
+
+: > "$GH_STUB_COUNT"
+OUTPUT=$(GH_STUB_ISSUE_JSON="$NO_VERDICT_THREAD" verify_finding_landed 59 1 2>&1)
+assert_eq "a pass that added nothing to the thread fails" "1" "$?"
+assert_eq "says the deliverable is the comment" "1" \
+  "$(echo "$OUTPUT" | grep -c "deliverable IS the comment")"
+
+: > "$GH_STUB_COUNT"
+GH_STUB_ISSUE_JSON_FIRST="$(issue_json "$IMPLEMENTER:🤖 Attempt 1/3 starting.")" \
+  GH_STUB_ISSUE_JSON="$NO_VERDICT_THREAD" \
+  verify_finding_landed 59 0 > /dev/null 2>&1
+assert_eq "a finding that reads stale on the first look still verifies" "0" "$?"
+
+: > "$GH_STUB_COUNT"
+GH_STUB_FAIL=yes verify_finding_landed 59 0 > /dev/null 2>&1
+assert_eq "a failed read is unverifiable, not a missing finding (exit 2)" "2" "$?"
 
 finish

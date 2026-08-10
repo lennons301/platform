@@ -85,7 +85,7 @@ on any of it.
 The runner works one ticket per invocation by launching **passes**. A *pass* is a
 headless `claude -p "<prompt>"` process, run fresh in the ticket's own worktree,
 whose `--allowedTools` is rendered from that pass's verb array — its *capability
-contract* (see *Capability contracts*). There are three:
+contract* (see *Capability contracts*). There are four:
 
 - **Implement pass** — the execution prompt proper: an eight-step script that
   reads issue #N *as the spec* → reads `AGENTS.md`/`CONTEXT.md`/ADRs → implements
@@ -97,11 +97,16 @@ contract* (see *Capability contracts*). There are three:
 - **Repair pass** — a narrower prompt for a `CONFLICTING` PR: merge the default
   branch (never rebase or force-push), resolve with `/resolving-merge-conflicts`,
   re-validate, push. No attempt consumed.
+- **Research pass** — the `workflow:research` variant of the implement pass:
+  investigate, then post the finding as a comment on the issue. No repo edit, no
+  PR, no gates (see *Research tickets*). One attempt, same accounting.
 - **Review pass** — launches the `ticket-reviewer` agent under the reviewer
   identity and must end with a machine-readable `VERDICT:` line the runner checks
-  against GitHub (see *Verified side effects*).
+  against GitHub (see *Verified side effects*). Reviews the PR diff, or the issue
+  thread on a research ticket.
 
-Which pass runs is decided by *PR-state dispatch* (under *Execution*); it is all
+Which pass runs is decided by the ticket's own labels and *PR-state dispatch*
+(both under *Execution*); it is all
 deterministic shell — the model's invariants live in the runner, never in an
 agent's head.
 
@@ -178,7 +183,10 @@ and `/to-tickets` are what stamp `ready-for-agent`, downstream in the build lane
 `wayfinder:*` and an explicit `--issue` naming one is a hard error — "they must
 never reach this loop, however they got labelled `ready-for-agent`." An agent
 sent to *implement* a `wayfinder:grilling` ticket would answer its own question
-and open a PR for it.
+and open a PR for it. The build lane's own knowledge ticket — `workflow:research`
+— is the same objection with the opposite resolution: it *does* run in the loop,
+on a route that records the finding on the issue and reviews it there rather than
+synthesising a PR (see *Research tickets* under Execution).
 
 **One exit.** The map has exactly one exit — its **destination** (a spec to hand
 to lane 2/3, a decision locked as an ADR, or an in-place change). Individual
@@ -273,6 +281,7 @@ Durable knowledge is never lost to a close: it has already moved to its successo
 | `wayfinder:map` | its destination is realised — the spec+tickets exist, the decision is locked as an ADR, or the in-place change is made; a redrawn destination is a **fresh map**, not a reopening | the spec/tickets it produced, plus ADRs |
 | Spec issue (`/to-spec`) | `/to-tickets` decomposes it — closed with a comment linking the tickets it produced | the build tickets and their milestone |
 | Build ticket (`/to-tickets`) | its PR merges | merged code |
+| Research ticket (`workflow:research`) | its finding is approved — the runner closes it, there being no PR to merge | the finding comment on the closed issue (+ an ADR if it settled a decision) |
 | Milestone | it reaches `0 open` (milestone-autoclose) | — |
 
 The per-object *operational* specifics — how to close the spec issue, the `n+1`
@@ -314,10 +323,11 @@ from all of the above, and belongs to the owner batch by batch.
 ## Execution
 
 Execution takes one armed item off the frontier and produces a candidate
-change — a PR — through a **bounded loop** run by a **fresh, independent
+change — a PR, or a finding on a research ticket (see *Research tickets*) —
+through a **bounded loop** run by a **fresh, independent
 actor**: one item, one fresh instance, one worktree. The runner is a thin
 driver, never an orchestrator holding tickets in a shared context. When the
-objective signals pass, it hands the PR to Review.
+objective signals pass, it hands the candidate to Review.
 
 ### Independent per-ticket loops
 
@@ -392,7 +402,7 @@ vocabulary, and where `CONTEXT.md`/ADRs live (writes `docs/agents/`).
    |---|---|
    | `workflow:tdd` | `/tdd` — must name its seams in the body |
    | `workflow:diagnosing-bugs` | `/diagnosing-bugs` |
-   | `workflow:research` | `/research` |
+   | `workflow:research` | `/research` — finding on the issue, no PR; see below |
    | `workflow:prototype` | `/prototype` — HITL, pair with `ready-for-human` |
 
    No label means the agent uses its judgement, as before.
@@ -402,6 +412,63 @@ vocabulary, and where `CONTEXT.md`/ADRs live (writes `docs/agents/`).
 3. **Promotion rule** — the same bespoke workflow in three tickets gets
    promoted: prefer an upstream skill where one fits, otherwise add a named
    workflow to this table via PR.
+
+### Research tickets: the finding is the deliverable, not a PR
+
+One label in that table changes the *shape* of the deliverable rather than the
+method: a `workflow:research` ticket asks a question, and what answers it is a
+**finding**, not code. Findings belong **on the issue that asked** — question and
+answer in one place, where anyone reading the ticket later finds both.
+
+This is the third position on the same axis the wayfinder carve-out sits on
+(*Wayfinder*, above). Both say a decision/knowledge ticket is not a build slice;
+they differ on who resolves it:
+
+| Ticket kind | Reaches `ticket-loop.sh`? | Resolved by | Deliverable |
+|---|---|---|---|
+| Build slice | yes | implement pass | a merged PR |
+| `workflow:research` | yes, on its own route | research pass, then reviewed | a finding recorded on the issue |
+| `wayfinder:*` | **never** — refused | a human (or `/wayfinder`), by assignment | a fact on the map |
+
+A research ticket *should* still get fresh eyes — of the finding rather than of a
+diff — which is exactly why it stays in the loop instead of joining the wayfinder
+refusal.
+
+**The route.** Selected by the `workflow:research` label, the runner takes a
+second path through the same guarantees and never touches the PR machinery:
+
+| Stage | Build slice | Research ticket |
+|---|---|---|
+| Attempts | `🤖 Attempt N/M` on the issue | identical — same marker, same `MAX_ATTEMPTS` |
+| Pre-work dispatch | PR-state dispatch (below) | none — there is no PR to read |
+| Work | implement pass → commits → PR | **research pass** → finding posted with `gh issue comment`; no repo edit, no branch push, no PR |
+| Landing gate | review gates: arm auto-merge or `human-signoff` | **skipped** — nothing to merge, so nothing to gate |
+| Review | `ticket-reviewer` on the PR diff, verdict as a PR review | `ticket-reviewer` in **issue-thread mode** on `gh issue view <n> --comments`, verdict as an issue comment |
+| Verified side effect | the reviewer's review is on the PR | the reviewer's **verdict comment** is on the issue |
+| Outcome of `approve` | the PR lands (auto-merge or a human) | the runner **closes the issue** — the question is answered |
+| Outcome of `request-changes` | issue stays open, attempt counted | identical |
+
+**Same two guarantees, one object over.** The runner is still the deterministic
+guarantor of both side effects, because narration is still not evidence (see
+*Verified side effects*): the finding must be a comment the issue did not already
+have — the research analogue of "no open PR after the implement pass" — and the
+reviewer's verdict must be a verdict comment by the reviewer identity matching
+the `VERDICT:` line the pass claimed. Either missing fails the run.
+
+**Three consequences worth knowing:**
+
+- **Still one worktree per ticket.** The research pass runs in the ticket's own
+  worktree like any other — it reads the repo, it just never writes to it, so the
+  `agent/issue-<n>` branch stays local and unpushed with no commits on it.
+- **No review-only dispatch.** With no PR to read a state off, a re-run works the
+  ticket from the top: it re-investigates and spends another attempt. A verified
+  review is therefore worth more here than on the PR path, where a failed
+  verification costs only a review rerun.
+- **A research pass can only run what it is permitted.** Its capability contract
+  is the issue verbs plus `doppler run` (`RESEARCH_VERBS`); anything else depends
+  on the repo's own allowlist, or `--afk`. The prompt says so, and tells the pass
+  to report an unrunnable check as a gap in the finding — an unrun experiment
+  written up as a result is the one outcome worse than an admitted gap.
 
 ### Capability contracts
 
@@ -420,7 +487,7 @@ capabilities cannot drift.
 This estate's bindings:
 
 - **The laptop runner** (`scripts/ticket-loop.sh`): the contract is the
-  `IMPLEMENT_VERBS` / `REPAIR_VERBS` / `REVIEW_VERBS` arrays. Each pass's
+  `IMPLEMENT_VERBS` / `REPAIR_VERBS` / `RESEARCH_VERBS` / `REVIEW_VERBS` arrays. Each pass's
   `--allowedTools` is rendered from its array, and the permission preflight
   checks ask/deny rules against the same arrays — one definition, three
   consumers. Changing a pass prompt (or `templates/agents/ticket-reviewer.md`,
@@ -428,7 +495,10 @@ This estate's bindings:
   same change. `REPAIR_VERBS` is the implement set minus the PR-creation
   verbs (`gh pr list` / `create` / `edit`), keeping `git fetch` /
   `git merge` — no rebase or force-push verb appears in any headless
-  contract.
+  contract. `RESEARCH_VERBS` is narrower still — the issue verbs and
+  `doppler run`, no git and no PR verbs, because a research ticket produces
+  no commit and no PR by design (see *Research tickets*), and `REVIEW_VERBS`
+  carries `gh issue comment` for the reviewer's issue-thread verdict.
 - **Interlude's Phase 5 native executor** provides capabilities
   architecturally (`--dangerously-skip-permissions` inside isolated
   containers, GitHub side-effects moved to the orchestrator, git via
@@ -600,6 +670,12 @@ implement pass's word) and now for the review itself:
 - a mismatch exits non-zero naming what the pass claimed against what GitHub
   shows. A pass that emits no readable verdict, or a PR read that fails, is
   *unverifiable* — also non-zero, because "can't tell" is not "fine".
+
+On a research ticket both side effects are issue comments instead, verified the
+same way (see *Research tickets*): the finding must be a comment the issue did
+not already have, and the reviewer identity's posted verdict comment must equal
+the verdict the pass claimed — every verdict there being the same kind of side
+effect, escalation included, so no per-verdict exception applies.
 
 Logic lives in `scripts/review-verify-lib.sh` (tested by
 `checks/tests/test-review-verify.sh`); mismatches are re-read a few times first
