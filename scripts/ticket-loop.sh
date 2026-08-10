@@ -370,7 +370,11 @@ if [ "$MODE" = "implement" ]; then
     # sunset projectCards field and error out (observed 2026-07-28, gh 2.45).
     gh api "repos/{owner}/{repo}/issues/$ISSUE/labels" -f 'labels[]=ready-for-human' > /dev/null
     gh api -X DELETE "repos/{owner}/{repo}/issues/$ISSUE/labels/ready-for-agent" > /dev/null || true
-    gh issue comment "$ISSUE" --body "🤖 $((ATTEMPT - 1)) agent attempts without an approved PR — flagging ready-for-human."
+    # What "no result" means depends on the ticket's deliverable: a research
+    # ticket never had a PR to get approved (see the research section below).
+    EXHAUSTED_WITHOUT="an approved PR"
+    [ -n "$RESEARCH" ] && EXHAUSTED_WITHOUT="an approved finding"
+    gh issue comment "$ISSUE" --body "🤖 $((ATTEMPT - 1)) agent attempts without $EXHAUSTED_WITHOUT — flagging ready-for-human."
     exit 1
   fi
   gh issue comment "$ISSUE" --body "🤖 Attempt $ATTEMPT/$MAX_ATTEMPTS starting." > /dev/null

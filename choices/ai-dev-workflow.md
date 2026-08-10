@@ -457,6 +457,9 @@ the `VERDICT:` line the pass claimed. Either missing fails the run.
 
 **Two consequences worth knowing:**
 
+- **Still one worktree per ticket.** The research pass runs in the ticket's own
+  worktree like any other — it reads the repo, it just never writes to it, so the
+  `agent/issue-<n>` branch stays local and unpushed with no commits on it.
 - **No review-only dispatch.** With no PR to read a state off, a re-run works the
   ticket from the top: it re-investigates and spends another attempt. A verified
   review is therefore worth more here than on the PR path, where a failed
