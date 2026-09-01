@@ -1,0 +1,5 @@
+# Tools this repo's scripts and checks need. `mise install` (or `just setup`).
+[tools]
+shellcheck = "0.11.0"
+yq = "4"
+jq = "1.7"

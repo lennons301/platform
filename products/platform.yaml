@@ -1,0 +1,36 @@
+name: platform
+description: Estate-wide governance repo — standards, choices, conformity checks, templates
+category: infrastructure
+repo: lennons301/platform
+status: active
+
+choices:
+  ai_workflow: ticket-loop
+  ci_cd: github-actions
+  secrets: doppler
+
+divergences:
+  - standard: hosting
+    choice: none
+    reason: >
+      Nothing is deployed. The repo is shell scripts, YAML and Markdown, run
+      from GitHub Actions and from developer machines; there is no running
+      service to host.
+  - standard: database
+    choice: none
+    reason: >
+      No persistent state. The only generated artefact is
+      data/conformity-snapshot.json, committed to git by the audit workflow.
+  - standard: orm
+    choice: none
+    reason: >
+      No database, so no ORM. Product and version data is YAML read with yq.
+  - standard: auth
+    choice: none
+    reason: >
+      No users and no runtime surface to authenticate against. The scripts
+      authenticate to GitHub as whoever runs them (gh CLI / GH_TOKEN).
+  - standard: ui
+    choice: none
+    reason: >
+      No user interface. Output is check-script stdout and the JSON snapshot.
