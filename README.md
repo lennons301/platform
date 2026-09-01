@@ -30,7 +30,17 @@ Estate-wide standards, choices, product registry, and conformity checks.
 
 # Run the shell test suite
 ./checks/tests/run-tests.sh
+
+# Lint the shell sources (shellcheck over checks/ and scripts/)
+./scripts/lint.sh
 ```
+
+Both of the last two run on every pull request
+(`.github/workflows/pr-checks.yml`), and are wrapped as `just test` / `just lint`.
+`just setup` installs the pinned tools from `.mise.toml`.
+
+This repo audits itself: `products/platform.yaml` is its own registry entry, so
+`check-estate.sh` reports on it alongside the products.
 
 ## For agents
 

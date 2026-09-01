@@ -37,8 +37,11 @@ docs/                — presentations and design specs
 # File GitHub Issues for gaps recorded in the snapshot
 ./checks/create-issues.sh [--dry-run] [--snapshot <path>]
 
-# Run the shell test suite for the check tooling
+# Run the shell test suite for the check tooling (also `just test`)
 ./checks/tests/run-tests.sh
+
+# Lint every shell script with shellcheck (also `just lint`)
+./scripts/lint.sh
 
 # Individual checks
 ./checks/check-documentation.sh <project-path> <product-yaml>
@@ -125,6 +128,15 @@ docs/                — presentations and design specs
 - Adding a check means registering it in `checks/check-all.sh` **and** bumping the dimension count in `checks/tests/test-snapshot.sh`
 - `create-issues.sh` routes gaps by dimension: mechanical ones get `platform-upgrade`, ones needing a human decision get `ready-for-human` (see `issue_label`)
 - `data/conformity-snapshot.json` is the machine-readable contract between checks, create-issues.sh, and the planned estate dashboard
+- This repo is audited like any other: `products/platform.yaml` is its registry
+  entry, so `check-estate.sh` reports on it. Dimensions the estate standards
+  assume an application toolchain for (versions, environments, linting) are
+  documented divergences there — a real gap here is fixed, not diverged away
+- Every PR runs `./checks/tests/run-tests.sh` and `./scripts/lint.sh`
+  (`.github/workflows/pr-checks.yml`, a required check on `master`). New shell
+  goes in `checks/` or `scripts/` and must be shellcheck-clean at default
+  severity; suppress a false positive with an inline
+  `# shellcheck disable=SCxxxx  # <why>`, never by loosening the invocation
 
 ## Platform Context
 

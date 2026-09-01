@@ -8,19 +8,19 @@ choices:
   ai_workflow: ticket-loop
   ci_cd: github-actions
   secrets: doppler
+  dev_environment: mise-just
 
 divergences:
   - standard: hosting
     choice: none
     reason: >
-      Nothing is deployed. The repo is shell scripts, YAML and Markdown, run
-      from GitHub Actions and from developer machines; there is no running
-      service to host.
+      Nothing is deployed. The repo is shell, YAML and Markdown, run from
+      GitHub Actions and from developer machines; there is no service to host.
   - standard: database
     choice: none
     reason: >
-      No persistent state. The only generated artefact is
-      data/conformity-snapshot.json, committed to git by the audit workflow.
+      No persistent state. The one generated artefact,
+      data/conformity-snapshot.json, is committed to git by the audit workflow.
   - standard: orm
     choice: none
     reason: >
@@ -34,3 +34,22 @@ divergences:
     choice: none
     reason: >
       No user interface. Output is check-script stdout and the JSON snapshot.
+  - standard: versions
+    choice: none
+    reason: >
+      versions/manifest.yaml tracks the Node/TypeScript ecosystem. This repo has
+      no Node runtime, framework or ORM to version — bash, yq, jq and shellcheck
+      are pinned in .mise.toml instead.
+  - standard: environments
+    choice: none
+    reason: >
+      No dev/stg/prd deployment tiers, and no service to stand up locally, so
+      no docker-compose. The scripts run against live GitHub either from a
+      developer machine or from Actions.
+  - standard: linting
+    choice: shellcheck
+    reason: >
+      The linting standard's shape (biome/eslint/ruff config plus a JS- or
+      Python-hosted pre-commit runner) presumes an application toolchain this
+      repo does not have. Bash is linted with shellcheck via ./scripts/lint.sh,
+      run by `just lint` and required on every PR (.github/workflows/pr-checks.yml).
