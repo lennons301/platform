@@ -122,23 +122,27 @@ assert_eq "dry run files nothing" "0" "$(creates)"
 assert_eq "dry run reports the intent" "1" "$(echo "$out" | grep -c 'DRY RUN: would raise')"
 
 # --- errors ---------------------------------------------------------------------------
+#
+# Exit 2, not 1: "the alarm could not do its job" is a different fact from "the
+# alarm is raised", and the conformity job's failure handler tolerates only the
+# latter.
 
 out=$("$SCRIPT" --repo example/platform 2>&1)
-assert_eq "neither --snapshot nor --failed-run is an error (exit 1)" "1" "$?"
+assert_eq "neither --snapshot nor --failed-run is a script error (exit 2)" "2" "$?"
 assert_eq "says which flags are needed" "1" "$(echo "$out" | grep -c -- 'pass --snapshot .* or --failed-run')"
 
 out=$("$SCRIPT" --snapshot "$SNAP" 2>&1)
-assert_eq "missing --repo is an error (exit 1)" "1" "$?"
+assert_eq "missing --repo is a script error (exit 2)" "2" "$?"
 
 out=$("$SCRIPT" --repo example/platform --snapshot "$SNAP" --max-age-hours soon 2>&1)
-assert_eq "a non-numeric age limit is an error (exit 1)" "1" "$?"
+assert_eq "a non-numeric age limit is a script error (exit 2)" "2" "$?"
 
 out=$("$SCRIPT" --repo example/platform --snapshot "$SNAP" --bogus 2>&1)
-assert_eq "unknown argument is an error (exit 1)" "1" "$?"
+assert_eq "unknown argument is a script error (exit 2)" "2" "$?"
 
 snapshot_at "2026-07-31T06:00:00Z"
 out=$(GH_STUB_CREATE_FAIL=1 run --snapshot "$SNAP")
-assert_eq "a failed issue creation still exits 1" "1" "$?"
+assert_eq "an unfileable alarm is a script error (exit 2)" "2" "$?"
 assert_eq "says the alarm could not be filed" "1" "$(echo "$out" | grep -c 'could not file the alarm issue')"
 
 finish

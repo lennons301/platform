@@ -54,6 +54,10 @@ assert_eq "a failed run raises the alarm" "1" \
   "$(step_if 'Raise the feed alarm' | grep -c 'failure()')"
 assert_eq "the alarm step calls the tested script" "1" \
   "$(yq -r '.jobs.check.steps[] | select(.name == "Raise the feed alarm") | .run' "$WF" | grep -c 'scripts/conformity-alarm.sh')"
+# Exit 1 is "alarm raised" and expected in an already-red run; exit 2 is the
+# alarm failing to file, which must not be swallowed.
+assert_eq "the alarm step tolerates exit 1 only" "1" \
+  "$(yq -r '.jobs.check.steps[] | select(.name == "Raise the feed alarm") | .run' "$WF" | grep -c '\[ "$?" -eq 1 \]')"
 
 # --- permissions match what the steps actually do ---------------------------------
 

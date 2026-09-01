@@ -90,8 +90,11 @@ jobs:
       - name: Raise the feed alarm
         if: failure()
         run: |
+          # Exit 1 means "alarm raised" — expected here, the run is already
+          # red. Exit 2 means the alarm itself failed and must not be swallowed.
           ./scripts/conformity-alarm.sh \
             --repo "$GITHUB_REPOSITORY" \
-            --failed-run "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+            --failed-run "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            || [ "$?" -eq 1 ]
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}

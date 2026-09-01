@@ -35,8 +35,8 @@ Estate-wide standards, choices, product registry, and conformity checks.
 The freshest snapshot is always one command away, no clone of this repo needed:
 
 ```bash
-gh api repos/lennons301/platform/contents/data/conformity-snapshot.json \
-  --field ref=automation/conformity-snapshot --jq '.content' | base64 -d
+gh api -H "Accept: application/vnd.github.raw" \
+  "repos/lennons301/platform/contents/data/conformity-snapshot.json?ref=automation/conformity-snapshot"
 ```
 
 ## For agents

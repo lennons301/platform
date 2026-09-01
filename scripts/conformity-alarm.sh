@@ -12,8 +12,13 @@
 #
 # It files exactly one open tracking issue while the feed is broken (repeat
 # runs are a no-op, not a comment stream) and closes it as soon as a fresh
-# snapshot shows up. Exit code: 0 = feed healthy, 1 = alarm raised or error, so
-# the watchdog run is red for as long as the feed is.
+# snapshot shows up.
+#
+# Exit codes: 0 = feed healthy, 1 = alarm raised or still standing (the
+# watchdog run stays red for as long as the feed is), 2 = the alarm itself
+# could not do its job — bad arguments, or GitHub refused the write. Callers
+# that already know the feed is broken (the conformity job's own failure
+# handler) tolerate 1 and must not tolerate 2.
 set -uo pipefail
 
 REPO="${GITHUB_REPOSITORY:-}"
@@ -55,41 +60,41 @@ while [ $# -gt 0 ]; do
     --now) NOW="${2:-}"; shift 2 ;;
     --dry-run) DRY_RUN=true; shift ;;
     -h|--help) usage; exit 0 ;;
-    *) echo "ERROR: unknown argument: $1" >&2; usage >&2; exit 1 ;;
+    *) echo "ERROR: unknown argument: $1" >&2; usage >&2; exit 2 ;;
   esac
 done
 
 if [ -z "$REPO" ]; then
   echo "ERROR: --repo (or \$GITHUB_REPOSITORY) is required." >&2
   usage >&2
-  exit 1
+  exit 2
 fi
 if [ -z "$FAILED_RUN" ] && [ -z "$SNAPSHOT" ]; then
   echo "ERROR: pass --snapshot (staleness check) or --failed-run (failure alarm)." >&2
   usage >&2
-  exit 1
+  exit 2
 fi
 if ! [[ "$MAX_AGE_HOURS" =~ ^[0-9]+$ ]]; then
   echo "ERROR: --max-age-hours must be a whole number of hours." >&2
-  exit 1
+  exit 2
 fi
 
 for cmd in jq date; do
   if ! command -v "$cmd" > /dev/null 2>&1; then
     echo "ERROR: $cmd is required." >&2
-    exit 1
+    exit 2
   fi
 done
 if [ "$DRY_RUN" = false ] && ! command -v gh > /dev/null 2>&1; then
   echo "ERROR: gh is required (or pass --dry-run)." >&2
-  exit 1
+  exit 2
 fi
 
 if [ -n "$NOW" ]; then
   now_epoch=$(date -u -d "$NOW" +%s 2>/dev/null)
   if [ -z "$now_epoch" ]; then
     echo "ERROR: --now is not a parseable timestamp: $NOW" >&2
-    exit 1
+    exit 2
   fi
 else
   now_epoch=$(date -u +%s)
@@ -161,7 +166,7 @@ if [ -z "$PROBLEM" ]; then
     || echo "WARN: could not comment on alarm issue #$existing." >&2
   if ! out=$(gh issue close "$existing" --repo "$REPO" 2>&1); then
     echo "ERROR: could not close alarm issue #$existing: $out" >&2
-    exit 1
+    exit 2
   fi
   echo "Cleared the conformity alarm (closed issue #$existing)."
   exit 0
@@ -207,7 +212,7 @@ gh label create "$LABEL" --repo "$REPO" --color "D93F0B" \
 
 if ! out=$(gh issue create --repo "$REPO" --title "$TITLE" --label "$LABEL" --body "$body" 2>&1); then
   echo "ERROR: could not file the alarm issue: $out" >&2
-  exit 1
+  exit 2
 fi
 echo "Raised the conformity alarm: $out" >&2
 exit 1
