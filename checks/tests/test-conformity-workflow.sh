@@ -92,4 +92,17 @@ assert_eq "watchdog reads the feed branch, not just the committed copy" "1" \
   "$(yq -r '.jobs.watchdog.steps[] | select(.env.FEED_BRANCH) | .env.FEED_BRANCH' "$WATCHDOG" | grep -c 'automation/conformity-snapshot')"
 assert_eq "watchdog may file issues" "write" "$(yq -r '.permissions.issues' "$WATCHDOG")"
 
+# --- the snapshot PR can actually land --------------------------------------------
+
+# The whole fix is worthless if the snapshot PR needs a human sign-off: that
+# just moves the stall from a rejected push to an unmerged PR. The snapshot
+# path must stay gate-clear, so adding a glob that swallows it fails here
+# rather than quietly re-stalling the committed copy months later.
+GATES="../../standards/review-gates.yaml"
+REPO_GATES="../../docs/agents/review-gates.yaml"
+source ../../scripts/review-gates-lib.sh
+gate_hits="$(evaluate_review_gates "$GATES" "$REPO_GATES" "data/conformity-snapshot.json")"
+assert_eq "the snapshot PR matches no human-signoff gate" "1" \
+  "$([ -z "$gate_hits" ] && echo 1 || echo 0)"
+
 finish

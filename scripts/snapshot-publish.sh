@@ -12,7 +12,9 @@
 #   2. when the snapshot changed *semantically* (i.e. ignoring `generated_at`
 #      and `platform_commit` churn), it also opens a PR from that branch onto
 #      the default branch, so the committed copy still lands the way every
-#      other change to this repo does — through review.
+#      other change to this repo does — through review. That PR touches only
+#      the snapshot, which matches no glob in `standards/review-gates.yaml`,
+#      so it is gate-clear and auto-merge is armed on it.
 #
 #   ./scripts/snapshot-publish.sh --snapshot data/conformity-snapshot.json \
 #       --repo lennons301/platform
@@ -206,10 +208,30 @@ if [ -z "$REPO" ]; then
   exit 1
 fi
 
+# Arm auto-merge so the PR lands the moment it goes green and gets its approval,
+# instead of waiting for someone to come back and press the button. This repo's
+# protection requires one approving review, so this does NOT make the snapshot
+# self-merging — it removes the second human step, not the first.
+#
+# Best-effort by design: the feed branch is already updated and is the home
+# consumers read, so a PR that stays disarmed delays the reviewed copy without
+# stalling the feed. Failing the run here would turn a cosmetic problem into a
+# red build that suppresses nothing useful.
+arm_auto_merge() { # <pr-number-or-url>
+  if out=$(gh pr merge "$1" --repo "$REPO" --auto --squash 2>&1); then
+    echo "Auto-merge armed on the snapshot PR."
+  else
+    echo "WARNING: could not arm auto-merge on the snapshot PR: $out" >&2
+  fi
+}
+
 existing=$(gh pr list --repo "$REPO" --head "$BRANCH" --base "$BASE" --state open \
   --json number --jq '.[0].number' 2>/dev/null || echo "")
 if [ -n "$existing" ] && [ "$existing" != "null" ]; then
   echo "PR #$existing already open from $BRANCH — refreshed with the new snapshot."
+  # Re-arm rather than assume: an earlier run may have failed to arm, and a
+  # push to the head branch can drop auto-merge again.
+  arm_auto_merge "$existing"
   exit 0
 fi
 
@@ -225,6 +247,10 @@ Nothing here is hand-written: the branch is rebuilt from \`$BASE\` on every run 
 run to refresh. The always-current copy lives on the \`$BRANCH\` branch either way —
 merging this only updates the committed one.
 
+Auto-merge is armed, and this PR is gate-clear (it touches only \`$SNAPSHOT_PATH\`,
+which matches no glob in \`standards/review-gates.yaml\`) — so one approval lands it,
+with no second trip back to press merge.
+
 <sub>Opened by \`scripts/snapshot-publish.sh\`. This repo's own branch protection is
 why the snapshot arrives as a PR rather than a direct push.</sub>"
 
@@ -234,3 +260,13 @@ if ! out=$(gh pr create --repo "$REPO" --base "$BASE" --head "$BRANCH" \
   exit 1
 fi
 echo "Opened a snapshot PR: $out"
+
+# `gh pr create` prints the PR URL, but 2>&1 above means notices can share the
+# capture — take the trailing number off the last URL-shaped line rather than
+# trusting the whole blob to be one URL.
+pr_number=$(printf '%s\n' "$out" | grep -oE '/pull/[0-9]+' | tail -1 | grep -oE '[0-9]+')
+if [ -n "$pr_number" ]; then
+  arm_auto_merge "$pr_number"
+else
+  echo "WARNING: could not read the new PR number from gh output — auto-merge not armed." >&2
+fi

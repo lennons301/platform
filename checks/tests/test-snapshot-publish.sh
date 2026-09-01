@@ -23,6 +23,12 @@ case "$1 $2" in
     fi
     echo "https://github.com/example/platform/pull/99"
     ;;
+  "pr merge")
+    if [ -n "${GH_STUB_MERGE_FAIL:-}" ]; then
+      echo "auto-merge is not enabled on this repository" >&2
+      exit 1
+    fi
+    ;;
 esac
 exit 0
 EOF
@@ -83,6 +89,10 @@ assert_eq "PR targets base from the feed branch" "1" \
   "$(grep -c -- "pr create --repo example/platform --base master --head automation/conformity-snapshot" "$GH_STUB_CALLS")"
 assert_eq "reports the semantic change" "1" "$(echo "$out" | grep -c 'Snapshot changed semantically')"
 
+# A PR nobody merges is the same stall as a push nobody accepts, one step later.
+assert_eq "auto-merge armed on the new PR" "1" \
+  "$(grep -c -- "pr merge 99 --repo example/platform --auto --squash" "$GH_STUB_CALLS")"
+
 # The feed branch must be a single-file diff on top of base, not a growing chain.
 assert_eq "feed commit sits directly on the base tip" "$BEFORE_MASTER" \
   "$(git -C "$TMP/origin.git" rev-parse 'automation/conformity-snapshot^')"
@@ -107,6 +117,10 @@ assert_eq "no second PR when one is open" "0" "$(pr_creates)"
 setup
 out=$(GH_STUB_PR=42 publish "2026-09-01T06:00:00Z" 7)
 assert_eq "names the open PR" "1" "$(echo "$out" | grep -c 'PR #42 already open')"
+# Re-armed every run: an earlier run may have failed to arm it, and pushing the
+# head branch can drop auto-merge again.
+assert_eq "auto-merge re-armed on the open PR" "1" \
+  "$(grep -c -- "pr merge 42 --repo example/platform --auto --squash" "$GH_STUB_CALLS")"
 
 # --- repeat runs converge -----------------------------------------------------
 
@@ -156,6 +170,15 @@ echo '{not json' > "$TMP/bad.json"
 out=$("$SCRIPT" --snapshot "$TMP/bad.json" --repo-dir "$TMP/work" --base master 2>&1)
 assert_eq "invalid snapshot JSON is an error (exit 1)" "1" "$?"
 assert_eq "says the snapshot is not JSON" "1" "$(echo "$out" | grep -c 'not valid JSON')"
+
+# Arming is best-effort: the feed branch — the copy consumers read — is already
+# published by this point, so a repo with auto-merge switched off delays the
+# reviewed copy rather than failing a run that measured the estate correctly.
+setup
+out=$(GH_STUB_MERGE_FAIL=1 publish "2026-09-01T06:00:00Z" 7)
+assert_eq "a failed arm does not fail the publish (exit 0)" "0" "$?"
+assert_eq "a failed arm warns" "1" "$(echo "$out" | grep -c 'WARNING: could not arm auto-merge')"
+assert_eq "the feed branch published anyway" "yes" "$(feed_exists)"
 
 setup
 out=$(GH_STUB_CREATE_FAIL=1 publish "2026-09-01T06:00:00Z" 7)
