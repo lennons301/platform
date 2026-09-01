@@ -29,6 +29,12 @@ assert_eq "no step pushes with bare git" "0" \
 assert_eq "the snapshot is published by the tested script" "1" \
   "$(yq -r '.jobs.check.steps[].run // ""' "$WF" | grep -c 'scripts/snapshot-publish.sh')"
 
+# The snapshot PR merging is a push to the default branch, which would re-trigger
+# this same workflow. `[skip ci]` guarded the old direct push; it cannot guard a
+# merge commit this job does not compose, so the guard lives on the path.
+assert_eq "the job ignores its own snapshot echo" "1" \
+  "$(yq -r '.on.push.paths-ignore[]' "$WF" | grep -c '^data/\*\*$')"
+
 # --- gap-filing is not collateral damage of the snapshot bookkeeping -------------
 
 GAPS="$(step_index 'Create issues for gaps')"

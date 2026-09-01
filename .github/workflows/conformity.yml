@@ -2,6 +2,14 @@ name: Estate Conformity Check
 on:
   push:
     branches: [main, master]
+    # Recursion guard. This job's own output lands on the default branch (the
+    # snapshot PR merging), and that push would otherwise start it again. The
+    # old direct-push path used `[skip ci]` in the commit message; a PR merge
+    # has no commit message this job controls — GitHub composes it, and squash
+    # vs merge changes it — so the guard moves to the path instead. A push that
+    # touches nothing but `data/**` is this job's own echo and is ignored.
+    paths-ignore:
+      - 'data/**'
   schedule:
     - cron: '0 6 * * *'   # daily 06:00 UTC — catches drift without a platform push
   workflow_dispatch:
