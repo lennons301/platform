@@ -79,6 +79,7 @@ _review_gates_path_matches() {
   [[ "$path" == $glob ]] && return 0
   # a leading '**/' also matches files at the repo root
   if [[ "$glob" == "**/"* ]]; then
+    # shellcheck disable=SC2053  # unquoted RHS is intentional: glob match
     [[ "$path" == ${glob#\*\*/} ]] && return 0
   fi
   return 1

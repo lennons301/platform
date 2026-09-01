@@ -54,6 +54,7 @@ REVIEWER_DOPPLER_PROJECT="${REVIEWER_DOPPLER_PROJECT:-platform}"
 REVIEWER_DOPPLER_CONFIG="${REVIEWER_DOPPLER_CONFIG:-prd}"
 REVIEWER_DOPPLER_SECRET="${REVIEWER_DOPPLER_SECRET:-REVIEWER_GH_TOKEN}"
 
+# shellcheck disable=SC2088  # a literal path printed for a human, never expanded
 ONBOARDING_DOC="~/code/platform/choices/ai-dev-workflow.md (Reviewer identity & onboarding)"
 
 ISSUE=""
@@ -320,8 +321,8 @@ DEFAULT_BRANCH="$(gh repo view --json defaultBranchRef --jq .defaultBranchRef.na
 # background job finishes, and UNKNOWN means "not computed yet" — never a
 # verdict either way. Poll until it resolves; fail rather than guess.
 pr_merge_state() {
-  local TRY STATE
-  for TRY in $(seq 1 20); do
+  local STATE
+  for _ in $(seq 1 20); do
     # || true: a transient gh failure is one failed try, not (via errexit) a
     # dead run — the empty STATE falls through to the retry like UNKNOWN does.
     STATE="$(gh pr view "$1" --json mergeable --jq '.mergeable // "UNKNOWN"' || true)"
@@ -721,6 +722,7 @@ set -e
 
 if [ "$GATE_RC" -eq 0 ]; then
   echo "==> Review gate matched — human sign-off required, auto-merge stays off."
+  # shellcheck disable=SC2001  # indenting every line, not one substitution
   echo "$GATE_MATCHES" | sed 's/^/    /'
   gh pr merge --disable-auto "$PR" > /dev/null 2>&1 || true
   # REST, not gh pr edit — see the projectCards note above.

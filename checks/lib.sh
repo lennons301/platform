@@ -14,9 +14,15 @@ else
   RED=''; GREEN=''; YELLOW=''; NC=''
 fi
 
+# The four status symbols are read by the scripts that source this file, which
+# is why each one carries an unused-variable exemption.
+# shellcheck disable=SC2034
 PASS="${GREEN}✓${NC}"
+# shellcheck disable=SC2034
 FAIL="${RED}✗${NC}"
+# shellcheck disable=SC2034
 WARN="${YELLOW}~${NC}"
+# shellcheck disable=SC2034
 DIVG="${GREEN}✓*${NC}"
 
 # Check that yq is available
