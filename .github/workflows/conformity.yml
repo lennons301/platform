@@ -50,8 +50,23 @@ jobs:
           # and collaborators via the API; without a token it warns and skips.
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
 
-      # Belt and braces: whatever happens to the steps below, the run this
-      # snapshot came from carries a downloadable copy of it.
+      # Gap-filing comes FIRST of everything downstream of the checks, and every
+      # step below is a bookkeeping step guarded so it can neither skip this one
+      # nor be skipped by it. That is the whole point: a rejected push once
+      # aborted the job before this step and a month of gap issues went unfiled
+      # as collateral damage.
+      #
+      # `always() &&` is load-bearing, not decoration — a bare `if:` has an
+      # implicit success() ANDed onto it, which would let any earlier step's
+      # failure silently skip gap-filing all over again.
+      - name: Create issues for gaps
+        if: always() && steps.snapshot.outcome == 'success'
+        run: ./checks/create-issues.sh --snapshot data/conformity-snapshot.json
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+
+      # Belt and braces: whatever happens to the publish step below, the run
+      # this snapshot came from carries a downloadable copy of it.
       - name: Upload snapshot artifact
         if: always() && steps.snapshot.outcome == 'success'
         uses: actions/upload-artifact@v4
@@ -59,16 +74,6 @@ jobs:
           name: conformity-snapshot
           path: data/conformity-snapshot.json
           retention-days: 90
-
-      # Gap-filing comes BEFORE persisting the snapshot, and persisting runs
-      # even if gap-filing fails. The two used to be coupled the other way
-      # round: a rejected push aborted the job and a month of gap issues went
-      # unfiled as collateral damage of a bookkeeping step.
-      - name: Create issues for gaps
-        if: steps.snapshot.outcome == 'success'
-        run: ./checks/create-issues.sh --snapshot data/conformity-snapshot.json
-        env:
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
 
       # This repo is subject to the reviewer flow it publishes, so the snapshot
       # cannot be pushed to the protected default branch. It goes to a feed

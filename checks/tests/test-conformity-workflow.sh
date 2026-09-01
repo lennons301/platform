@@ -44,6 +44,17 @@ assert_eq "persisting is skipped when there is no snapshot to persist" "1" \
 assert_eq "gap-filing is skipped when there is no snapshot" "1" \
   "$(step_if 'Create issues for gaps' | grep -c "steps.snapshot.outcome == 'success'")"
 
+# A bare `if:` carries an implicit success(), so any earlier step's failure
+# would skip gap-filing — the original bug, at smaller scale.
+assert_eq "gap-filing survives a failed bookkeeping step" "1" \
+  "$(step_if 'Create issues for gaps' | grep -c 'always()')"
+
+# Nothing that merely records the snapshot may sit between the checks and
+# gap-filing, whatever its guard says.
+ARTIFACT="$(step_index 'Upload snapshot artifact')"
+assert_eq "gap-filing precedes every persistence step" "1" \
+  "$([ "$GAPS" -lt "$ARTIFACT" ] && [ "$GAPS" -lt "$PUBLISH" ] && echo 1 || echo 0)"
+
 # A persist failure must still turn the run red — no continue-on-error escape.
 assert_eq "a persist failure fails the run" "false" \
   "$(yq -r '.jobs.check.steps[] | select(.name == "Publish snapshot") | .continue-on-error // false' "$WF")"
