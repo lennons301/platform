@@ -1,3 +1,6 @@
+# The `shell-checks` job is a required status check on master. To (re)apply it:
+#   ./scripts/setup-reviewer.sh --repo-dir . --require-check shell-checks
+# (needs a token with admin on the repo).
 name: PR Checks
 on:
   pull_request:

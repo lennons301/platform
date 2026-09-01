@@ -64,7 +64,7 @@ docs/                — presentations and design specs
 
 # Onboard a repo to the separate-reviewer-identity flow (idempotent): branch
 # protection, auto-merge, human-signoff + workflow:* labels, reviewer collaborator
-./scripts/setup-reviewer.sh --repo-dir <project-path>
+./scripts/setup-reviewer.sh --repo-dir <project-path> [--require-check <context>]
 
 # Close a milestone once its last open issue closes (what the reusable
 # milestone-autoclose workflow runs; safe to try locally with --dry-run)
