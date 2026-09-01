@@ -3,7 +3,9 @@
 cd "$(dirname "$0")" || exit 1
 source ./helpers.sh
 
-output=$(../create-issues.sh --dry-run --snapshot fixtures/snapshot.json)
+# stderr is silenced here: the fixture is deliberately old, and its staleness
+# warning has its own assertions below.
+output=$(../create-issues.sh --dry-run --snapshot fixtures/snapshot.json 2>/dev/null)
 
 assert_eq "plans exactly 4 issues" "4" \
   "$(echo "$output" | grep -c 'DRY RUN: would create issue')"
@@ -31,5 +33,18 @@ assert_eq "repo-less product is skipped with message" "1" \
   "$(echo "$output" | grep -c 'SKIP: beta/secrets (no repo configured)')"
 assert_eq "missing snapshot is an error" "1" \
   "$(../create-issues.sh --dry-run --snapshot /nonexistent.json 2>&1 > /dev/null | grep -c 'snapshot not found'; true)"
+
+# A stale snapshot describes an estate that has moved on — filing from it
+# silently is how a dead feed keeps looking alive.
+assert_eq "an old snapshot warns about its age" "1" \
+  "$(../create-issues.sh --dry-run --snapshot fixtures/snapshot.json 2>&1 > /dev/null | grep -c 'this snapshot is .*h old')"
+assert_eq "a fresh snapshot warns about nothing" "0" \
+  "$(SNAPSHOT_STALE_HOURS=999999 ../create-issues.sh --dry-run --snapshot fixtures/snapshot.json 2>&1 > /dev/null | grep -c 'WARNING')"
+
+UNDATED=$(mktemp)
+jq 'del(.generated_at)' fixtures/snapshot.json > "$UNDATED"
+assert_eq "an undated snapshot warns too" "1" \
+  "$(../create-issues.sh --dry-run --snapshot "$UNDATED" 2>&1 > /dev/null | grep -c 'no readable generated_at')"
+rm -f "$UNDATED"
 
 finish

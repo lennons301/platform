@@ -152,7 +152,27 @@ create_issue_if_needed() {
   CREATED=$((CREATED + 1))
 }
 
-echo "Reading snapshot: $SNAPSHOT (generated $(jq -r '.generated_at' "$SNAPSHOT"))"
+GENERATED_AT=$(jq -r '.generated_at // empty' "$SNAPSHOT")
+echo "Reading snapshot: $SNAPSHOT (generated ${GENERATED_AT:-unknown})"
+
+# Issues filed from a stale snapshot describe an estate that no longer exists,
+# and — worse — the gaps it does not mention read as closed. Say so here; the
+# conformity watchdog is what escalates it to a human (see "Estate conformity
+# feed" in choices/ci-cd.md).
+STALE_HOURS="${SNAPSHOT_STALE_HOURS:-48}"
+generated_epoch=""
+if [ -n "$GENERATED_AT" ]; then
+  generated_epoch=$(date -u -d "$GENERATED_AT" +%s 2>/dev/null)
+fi
+if [ -z "$generated_epoch" ]; then
+  echo "WARNING: snapshot has no readable generated_at — cannot tell how old it is." >&2
+else
+  age_hours=$(( ($(date -u +%s) - generated_epoch) / 3600 ))
+  if [ "$age_hours" -gt "$STALE_HOURS" ]; then
+    echo "WARNING: this snapshot is ${age_hours}h old (limit ${STALE_HOURS}h)." >&2
+    echo "         Regenerate it first: ./checks/check-estate.sh --json $SNAPSHOT" >&2
+  fi
+fi
 
 while IFS=$'\t' read -r name repo dimension details; do
   if [ -z "$repo" ] || [ "$repo" = "null" ]; then
