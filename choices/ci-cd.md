@@ -154,7 +154,21 @@ current picture should read that branch; the committed copy is the reviewed,
 human-facing record and moves only when the *conformity content* changes, not
 when a timestamp does.
 
-Three rules hold this together, and each one is a test in `checks/tests/`:
+The PR is opened with auto-merge armed. It is deliberately *gate-clear* — it
+touches only `data/conformity-snapshot.json`, which matches no glob in
+`standards/review-gates.yaml` — so one approval lands it and nobody has to come
+back to press merge. Branch protection still requires that approval; arming
+removes the second human step, not the first. A test pins the gate-clearance,
+because a gate glob that swallowed the snapshot path would re-stall the
+committed copy in exactly the silent way this whole section exists to prevent.
+
+Merging that PR is itself a push to the default branch, which would start the
+conformity job again. The old direct-push path used `[skip ci]`; a merge commit
+is composed by GitHub and varies with the merge strategy, so the guard lives on
+the trigger instead — `paths-ignore: ['data/**']`, which makes a snapshot-only
+push the job's own echo regardless of how it was merged.
+
+Four rules hold this together, and each one is a test in `checks/tests/`:
 
 - **Gap-filing is not downstream of bookkeeping.** "Create issues for gaps" runs
   before the snapshot is persisted, and persistence runs under `if: always()`.
@@ -168,6 +182,9 @@ Three rules hold this together, and each one is a test in `checks/tests/`:
   snapshots resume. The conformity workflow calls the same script on `failure()`.
 - **One open issue, no comment stream.** A repeat alarm is a no-op. An alarm
   that comments daily is an alarm people mute, which is how a month went by.
+- **The publisher's output cannot re-trigger the publisher.** The snapshot PR
+  merge is filtered out of the `push` trigger by path, so the feed does not
+  chase its own tail.
 
 ## Conventions
 

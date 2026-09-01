@@ -139,7 +139,12 @@ docs/                — presentations and design specs
   run — read this one for the current picture) and the default branch, where
   `scripts/snapshot-publish.sh` lands it by PR when the conformity content
   changes. CI never pushes to the protected default branch (see "Estate
-  conformity feed" in `choices/ci-cd.md`)
+  conformity feed" in `choices/ci-cd.md`). That PR is opened with auto-merge
+  armed and must stay gate-clear — a `standards/review-gates.yaml` glob that
+  matched `data/**` would re-stall the committed copy, so
+  `checks/tests/test-conformity-workflow.sh` asserts it does not. The snapshot
+  merge is kept out of the workflow's own `push` trigger by
+  `paths-ignore: ['data/**']`
 - Conformity gap-filing must never be downstream of snapshot bookkeeping: in
   `.github/workflows/conformity.yml`, "Create issues for gaps" precedes
   "Publish snapshot" and persistence runs under `if: always()`. A dead feed
