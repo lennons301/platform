@@ -164,7 +164,12 @@ fi
 
 mkdir -p "$(dirname "$WORKDIR/wt/$SNAPSHOT_PATH")"
 cp "$SNAPSHOT" "$WORKDIR/wt/$SNAPSHOT_PATH"
-git -C "$WORKDIR/wt" add -- "$SNAPSHOT_PATH"
+if ! out=$(git -C "$WORKDIR/wt" add -- "$SNAPSHOT_PATH" 2>&1); then
+  # Unchecked, this would fall through to the "already byte-identical" branch
+  # below and report success for a snapshot that was never staged.
+  echo "ERROR: could not stage $SNAPSHOT_PATH: $out" >&2
+  exit 1
+fi
 
 if git -C "$WORKDIR/wt" diff --cached --quiet; then
   echo "Feed branch is already byte-identical to $BASE — nothing to publish."

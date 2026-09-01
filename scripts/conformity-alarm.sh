@@ -90,8 +90,16 @@ if [ "$DRY_RUN" = false ] && ! command -v gh > /dev/null 2>&1; then
   exit 2
 fi
 
+# GNU and BSD `date` parse an ISO-8601 string with different flags. Try both,
+# or a local macOS run misreads every timestamp as unreadable and alarms on a
+# perfectly healthy feed.
+iso_to_epoch() {
+  date -u -d "$1" +%s 2>/dev/null ||
+    date -u -j -f "%Y-%m-%dT%H:%M:%SZ" "$1" +%s 2>/dev/null
+}
+
 if [ -n "$NOW" ]; then
-  now_epoch=$(date -u -d "$NOW" +%s 2>/dev/null)
+  now_epoch=$(iso_to_epoch "$NOW")
   if [ -z "$now_epoch" ]; then
     echo "ERROR: --now is not a parseable timestamp: $NOW" >&2
     exit 2
@@ -115,7 +123,7 @@ else
   generated_at=$(jq -r '.generated_at // empty' "$SNAPSHOT" 2>/dev/null)
   generated_epoch=""
   if [ -n "$generated_at" ]; then
-    generated_epoch=$(date -u -d "$generated_at" +%s 2>/dev/null)
+    generated_epoch=$(iso_to_epoch "$generated_at")
   fi
   if [ -z "$generated_epoch" ]; then
     PROBLEM="The conformity snapshot has no readable \`generated_at\`."
@@ -133,12 +141,33 @@ fi
 
 # --- find the open alarm issue, if any -------------------------------------------
 
+# Prints the open alarm issue's number, or nothing when there is none.
+# Returns non-zero when the *query* failed, which is not the same fact: an
+# unanswered search read as "no alarm open" would file a second alarm and
+# break the one-issue contract this script exists to keep.
 find_alarm_issue() {
-  # Search without the HTML comment tags — GitHub may not index comments.
-  local search_text
+  local search_text out
   search_text=$(printf '%s' "$MARKER" | sed 's/<!-- //;s/ -->//')
-  gh issue list --repo "$REPO" --state open --search "$search_text" \
-    --json number --jq '.[0].number' 2>/dev/null || echo ""
+
+  if ! out=$(gh issue list --repo "$REPO" --state open --search "$search_text" \
+      --json number --jq '.[0].number' 2>&1); then
+    echo "ERROR: could not search $REPO for an open alarm: $out" >&2
+    return 1
+  fi
+  [ "$out" = "null" ] && out=""
+
+  # The marker lives in an HTML comment and GitHub may not index it. Confirm
+  # against the exact title before concluding that nothing is open.
+  if [ -z "$out" ]; then
+    if ! out=$(gh issue list --repo "$REPO" --state open --search "$TITLE in:title" \
+        --json number,title --jq "[.[] | select(.title == \"$TITLE\")] | .[0].number" 2>&1); then
+      echo "ERROR: could not search $REPO for an open alarm by title: $out" >&2
+      return 1
+    fi
+    [ "$out" = "null" ] && out=""
+  fi
+
+  printf '%s' "$out"
 }
 
 if [ "$DRY_RUN" = true ]; then
@@ -150,8 +179,11 @@ if [ "$DRY_RUN" = true ]; then
   exit 0
 fi
 
-existing=$(find_alarm_issue)
-[ "$existing" = "null" ] && existing=""
+if ! existing=$(find_alarm_issue); then
+  # Blind on the dedupe: raising or clearing now would either duplicate the
+  # alarm or close one that should stand.
+  exit 2
+fi
 
 # --- healthy: clear the alarm -----------------------------------------------------
 

@@ -15,7 +15,17 @@ cat > "$TMP/bin/gh" <<'EOF'
 #!/usr/bin/env bash
 printf '%s\n' "$*" >> "$GH_STUB_CALLS"
 case "$1 $2" in
-  "issue list") printf '%s' "${GH_STUB_ISSUE:-}" ;;
+  "issue list")
+    if [ -n "${GH_STUB_LIST_FAIL:-}" ]; then
+      echo "API rate limit exceeded" >&2
+      exit 1
+    fi
+    # The script searches by marker first, then falls back to the exact title.
+    case "$*" in
+      *"in:title"*) printf '%s' "${GH_STUB_ISSUE_BY_TITLE:-}" ;;
+      *) printf '%s' "${GH_STUB_ISSUE:-}" ;;
+    esac
+    ;;
   "issue create")
     if [ -n "${GH_STUB_CREATE_FAIL:-}" ]; then echo "boom" >&2; exit 1; fi
     echo "https://github.com/example/platform/issues/7"
@@ -68,6 +78,19 @@ assert_eq "an already-open alarm stays raised (exit 1)" "1" "$?"
 assert_eq "no duplicate issue" "0" "$(creates)"
 assert_eq "no comment spam on the open alarm" "0" "$(grep -c '^issue comment' "$GH_STUB_CALLS")"
 assert_eq "says the alarm is already open" "1" "$(echo "$out" | grep -c 'Alarm already open as issue #7')"
+
+# The marker is an HTML comment, which GitHub may or may not index. Missing it
+# would file a duplicate alarm every single day.
+out=$(GH_STUB_ISSUE_BY_TITLE=9 run --snapshot "$SNAP")
+assert_eq "the title fallback still holds the alarm (exit 1)" "1" "$?"
+assert_eq "an alarm found only by title is not duplicated" "0" "$(creates)"
+assert_eq "names the issue found by title" "1" "$(echo "$out" | grep -c 'Alarm already open as issue #9')"
+
+# A search that failed is not a search that found nothing.
+out=$(GH_STUB_LIST_FAIL=1 run --snapshot "$SNAP")
+assert_eq "an unanswerable dedupe query is a script error (exit 2)" "2" "$?"
+assert_eq "no alarm filed while blind" "0" "$(creates)"
+assert_eq "says the search failed" "1" "$(echo "$out" | grep -c 'could not search example/platform for an open alarm')"
 
 # --- the threshold is configurable -------------------------------------------------
 

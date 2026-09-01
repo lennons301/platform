@@ -162,7 +162,7 @@ echo "Reading snapshot: $SNAPSHOT (generated ${GENERATED_AT:-unknown})"
 STALE_HOURS="${SNAPSHOT_STALE_HOURS:-48}"
 generated_epoch=""
 if [ -n "$GENERATED_AT" ]; then
-  generated_epoch=$(date -u -d "$GENERATED_AT" +%s 2>/dev/null)
+  generated_epoch=$(iso_to_epoch "$GENERATED_AT")
 fi
 if [ -z "$generated_epoch" ]; then
   echo "WARNING: snapshot has no readable generated_at — cannot tell how old it is." >&2
