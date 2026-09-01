@@ -9,7 +9,7 @@ Estate-wide standards, choices, product registry, and conformity checks.
 - `versions/manifest.yaml` — Target runtime/framework versions for the estate
 - `products/` — One YAML file per product (metadata, choices, versions, divergences)
 - `checks/` — Shell scripts that audit projects against standards and the manifest
-- `data/conformity-snapshot.json` — Machine-readable conformity snapshot (CI-committed; consumed by create-issues and the planned estate dashboard)
+- `data/conformity-snapshot.json` — Machine-readable conformity snapshot (consumed by create-issues and the planned estate dashboard). CI lands it here by PR when the conformity content changes; the always-current copy is on the `automation/conformity-snapshot` branch — see "Estate conformity feed" in `choices/ci-cd.md`
 - `templates/` — Starter files for new projects
 
 ## Quick start
@@ -30,6 +30,13 @@ Estate-wide standards, choices, product registry, and conformity checks.
 
 # Run the shell test suite
 ./checks/tests/run-tests.sh
+```
+
+The freshest snapshot is always one command away, no clone of this repo needed:
+
+```bash
+gh api repos/lennons301/platform/contents/data/conformity-snapshot.json \
+  --field ref=automation/conformity-snapshot --jq '.content' | base64 -d
 ```
 
 ## For agents

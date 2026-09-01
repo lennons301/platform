@@ -128,6 +128,47 @@ The logic lives in `scripts/milestone-autoclose.sh` in this repo (runnable
 locally with `--dry-run`), so fixes reach every product without a copy-paste
 round.
 
+## Estate conformity feed (platform repo only)
+
+The platform repo's own `Estate Conformity Check` measures every product daily
+and files gap issues. Where its snapshot goes is not a detail: `AGENTS.md` calls
+`data/conformity-snapshot.json` "the machine-readable contract between checks,
+create-issues.sh, and the planned estate dashboard".
+
+It used to `git push` that file straight to `master`. Once `setup-reviewer.sh`
+put branch protection on the platform repo's own default branch, every push was
+rejected with `GH006` — and because the failing step ran before gap-filing, a
+month of runs measured the estate and threw the result away. Nothing alarmed.
+
+The snapshot now has two homes, written by `scripts/snapshot-publish.sh`:
+
+| Where | Refreshed | Read by |
+| --- | --- | --- |
+| `automation/conformity-snapshot` branch | every run | the estate dashboard, the watchdog |
+| `data/conformity-snapshot.json` on the default branch | by PR, when the conformity content changes | humans, `create-issues.sh` defaults |
+
+The feed branch is rebuilt from the default branch each run and force-pushed, so
+its diff is always exactly one file — it never needs merging or conflict
+resolution, and nothing but the publisher writes to it. Consumers that want the
+current picture should read that branch; the committed copy is the reviewed,
+human-facing record and moves only when the *conformity content* changes, not
+when a timestamp does.
+
+Three rules hold this together, and each one is a test in `checks/tests/`:
+
+- **Gap-filing is not downstream of bookkeeping.** "Create issues for gaps" runs
+  before the snapshot is persisted, and persistence runs under `if: always()`.
+  Either can fail without suppressing the other; a persist failure still fails
+  the run.
+- **Silence is a failure state.** `Estate Conformity Watchdog` is a *separate*
+  daily workflow, because a check inside the conformity job cannot notice a job
+  that never ran. It reads the feed branch and calls
+  `scripts/conformity-alarm.sh`, which files exactly one `ready-for-human`
+  tracking issue once the snapshot passes 48h old and closes it when fresh
+  snapshots resume. The conformity workflow calls the same script on `failure()`.
+- **One open issue, no comment stream.** A repeat alarm is a no-op. An alarm
+  that comments daily is an alarm people mute, which is how a month went by.
+
 ## Conventions
 
 - The workflow file is called `ci.yml` (not `test.yml`, `checks.yml`, etc.)
