@@ -9,6 +9,23 @@ trap 'rm -rf "$TMPDIR"' EXIT
 
 P="$TMPDIR/proj"; mkdir -p "$P"
 
+# The floors under test are this fixture's, not the estate's: versions/manifest.yaml
+# is on a quarterly review cadence, and asserting against the live floors would
+# turn a manifest bump red on a required check for no reason of its own.
+export VERSIONS_MANIFEST="$TMPDIR/manifest.yaml"
+cat > "$VERSIONS_MANIFEST" <<'EOF'
+runtimes:
+  node: "22"
+frameworks:
+  next: "16"
+languages:
+  typescript: "5.7"
+tooling:
+  pnpm: "9"
+overrides:
+  infrastructure: {}
+EOF
+
 run_check() {
   ../check-versions.sh "$P" "$1" 2>&1
 }
@@ -21,11 +38,8 @@ package_manager: pnpm
 versions:
   node: "22"
   next: "16"
-  react: "19"
   typescript: "5.7"
   pnpm: "9"
-  biome: "1"
-  drizzle-kit: "0.30"
 divergences: []
 EOF
 out=$(run_check "$TMPDIR/current.yaml"); code=$?
@@ -40,11 +54,8 @@ package_manager: pnpm
 versions:
   node: "20"
   next: "16"
-  react: "19"
   typescript: "5.7"
   pnpm: "9"
-  biome: "1"
-  drizzle-kit: "0.30"
 divergences: []
 EOF
 out=$(run_check "$TMPDIR/behind.yaml"); code=$?
