@@ -69,9 +69,15 @@ REQUESTED_CHECKS="$(printf '%s\n' ${REQUIRE_CHECKS[@]+"${REQUIRE_CHECKS[@]}"} \
 
 PAYLOAD="$(jq -n --argjson existing "$EXISTING" --argjson requested "$REQUESTED_CHECKS" '
   {
+    # A PUT replaces the whole protection object, so anything not restated here
+    # is switched off. Gate on the block existing, not on the context count: a
+    # repo can require status checks with an empty context list ("require
+    # branches to be up to date" on its own), and dropping that block on an
+    # idempotent re-run would silently weaken protection this script is only
+    # meant to add to.
     required_status_checks: (
       (($existing.required_status_checks.contexts // []) + $requested | unique) as $contexts |
-      if ($contexts | length) > 0 then
+      if $existing.required_status_checks != null or ($contexts | length) > 0 then
         { strict: ($existing.required_status_checks.strict // false),
           contexts: $contexts }
       else null end
