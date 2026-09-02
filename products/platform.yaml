@@ -20,7 +20,9 @@ divergences:
     choice: none
     reason: >
       No persistent state. The one generated artefact,
-      data/conformity-snapshot.json, is committed to git by the audit workflow.
+      data/conformity-snapshot.json, is kept in git — the audit workflow
+      force-updates the automation/conformity-snapshot branch and lands it on
+      the default branch by PR.
   - standard: orm
     choice: none
     reason: >
