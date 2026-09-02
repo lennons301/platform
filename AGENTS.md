@@ -37,8 +37,11 @@ docs/                — presentations and design specs
 # File GitHub Issues for gaps recorded in the snapshot
 ./checks/create-issues.sh [--dry-run] [--snapshot <path>]
 
-# Run the shell test suite for the check tooling
+# Run the shell test suite for the check tooling (also `just test`)
 ./checks/tests/run-tests.sh
+
+# Lint every shell script with shellcheck (also `just lint`)
+./scripts/lint.sh
 
 # Individual checks
 ./checks/check-documentation.sh <project-path> <product-yaml>
@@ -61,7 +64,7 @@ docs/                — presentations and design specs
 
 # Onboard a repo to the separate-reviewer-identity flow (idempotent): branch
 # protection, auto-merge, human-signoff + workflow:* labels, reviewer collaborator
-./scripts/setup-reviewer.sh --repo-dir <project-path>
+./scripts/setup-reviewer.sh --repo-dir <project-path> [--require-check <context>]
 
 # Publish a freshly generated snapshot (feed branch always, PR when the
 # conformity content changed) — what the conformity workflow runs
@@ -152,6 +155,15 @@ docs/                — presentations and design specs
   `conformity-watchdog.yml` (snapshot older than 48h) and from the conformity
   job itself on `failure()`. `checks/tests/test-conformity-workflow.sh` guards
   that wiring
+- This repo is audited like any other: `products/platform.yaml` is its registry
+  entry, so `check-estate.sh` reports on it. Dimensions the estate standards
+  assume an application toolchain for (versions, environments, linting) are
+  documented divergences there — a real gap here is fixed, not diverged away
+- Every PR runs `./checks/tests/run-tests.sh` and `./scripts/lint.sh`
+  (`.github/workflows/pr-checks.yml`, a required check on `master`). New shell
+  goes in `checks/` or `scripts/` and must be shellcheck-clean at default
+  severity; suppress a false positive with an inline
+  `# shellcheck disable=SCxxxx  # <why>`, never by loosening the invocation
 
 ## Platform Context
 

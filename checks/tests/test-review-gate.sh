@@ -323,6 +323,7 @@ assert_eq "warn output parses as a warn dimension" "review-gate	warn" \
   "$(source ../lib.sh; echo "$OUTPUT" | parse_check_output | cut -f1,2)"
 unset FAKE_GH_UNAUTH
 
+# shellcheck disable=SC2123  # emptying PATH is the point: it makes `command -v gh` fail
 assert_eq "gh_ready reports an uninstalled gh" "$(printf 'gh CLI not installed\nexit=1')" \
   "$(source ../lib.sh; PATH=""; gh_ready; echo "exit=$?")"
 

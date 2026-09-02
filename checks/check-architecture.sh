@@ -43,7 +43,7 @@ if [ "$DIAGRAM_COUNT" != "null" ] && [ "$DIAGRAM_COUNT" != "0" ] && [ -n "$DIAGR
     found=false
     if [ -f "$ARCH_DIR/$diagram.puml" ]; then
       found=true
-    elif ls "$ARCH_DIR"/${diagram}-*.puml 1>/dev/null 2>&1; then
+    elif ls "$ARCH_DIR/${diagram}"-*.puml 1>/dev/null 2>&1; then
       found=true
     fi
     if [ "$found" = false ]; then
@@ -95,6 +95,7 @@ if [ ${#ISSUES[@]} -eq 0 ] && ls "$ARCH_DIR"/*.puml 1>/dev/null 2>&1; then
   fi
 
   for path in "${STALE_PATHS[@]}"; do
+    # shellcheck disable=SC2086  # staleness_paths entries may be globs ("infrastructure/*")
     if [ -e "$PROJECT_PATH/$path" ] || ls "$PROJECT_PATH"/$path 1>/dev/null 2>&1; then
       path_commit=$(git -C "$PROJECT_PATH" log -1 --format='%ct' -- "$path" 2>/dev/null || echo "0")
       if [ "$path_commit" -gt "$diagram_commit" ] 2>/dev/null; then

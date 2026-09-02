@@ -9,7 +9,8 @@
 # invitation steps and a re-run completes them):
 #   1. branch protection on the default branch: require 1 approving review,
 #      dismiss stale approvals on push — merged with any existing protection
-#      (required status checks and enforce_admins are preserved)
+#      (required status checks and enforce_admins are preserved; --require-check
+#      adds to the required contexts)
 #   2. enable the repo's allow-auto-merge setting
 #   3. create the human-signoff and workflow:* labels
 #   4. seed docs/agents/review-gates.yaml gate-extension stub (left for you
@@ -18,7 +19,11 @@
 #   6. accept the invitation using the reviewer PAT from Doppler
 #
 # Usage:
-#   ./scripts/setup-reviewer.sh [--repo-dir PATH]
+#   ./scripts/setup-reviewer.sh [--repo-dir PATH] [--require-check CONTEXT]...
+#
+# --require-check names a status check (the check run's name, e.g. the job's
+# `name:`) that must pass before the default branch will take a merge. Repeat
+# for several. Contexts already required are kept: this adds, never removes.
 #
 # Requires: gh (authenticated as the repo owner), jq, doppler (for step 6).
 # Manual prerequisites (once, estate-wide): create the machine account, mint
@@ -31,12 +36,15 @@ REVIEWER_DOPPLER_PROJECT="${REVIEWER_DOPPLER_PROJECT:-platform}"
 REVIEWER_DOPPLER_CONFIG="${REVIEWER_DOPPLER_CONFIG:-prd}"
 REVIEWER_DOPPLER_SECRET="${REVIEWER_DOPPLER_SECRET:-REVIEWER_GH_TOKEN}"
 
+# shellcheck disable=SC2088  # a literal path printed for a human, never expanded
 ONBOARDING_DOC="~/code/platform/choices/ai-dev-workflow.md (Reviewer identity & onboarding)"
 
 REPO_DIR="$PWD"
+REQUIRE_CHECKS=()
 while [ $# -gt 0 ]; do
   case "$1" in
     --repo-dir) REPO_DIR="$2"; shift 2 ;;
+    --require-check) REQUIRE_CHECKS+=("$2"); shift 2 ;;
     *) echo "Unknown argument: $1" >&2; exit 1 ;;
   esac
 done
@@ -56,12 +64,22 @@ echo "==> Onboarding $NWO (default branch: $DEFAULT_BRANCH) for reviewer $REVIEW
 # the variable must be overwritten, not defaulted inside the substitution.
 EXISTING="$(gh api "repos/$NWO/branches/$DEFAULT_BRANCH/protection" 2>/dev/null)" || EXISTING='{}'
 
-PAYLOAD="$(jq -n --argjson existing "$EXISTING" '
+REQUESTED_CHECKS="$(printf '%s\n' ${REQUIRE_CHECKS[@]+"${REQUIRE_CHECKS[@]}"} \
+  | jq -R -s 'split("\n") | map(select(length > 0))')"
+
+PAYLOAD="$(jq -n --argjson existing "$EXISTING" --argjson requested "$REQUESTED_CHECKS" '
   {
+    # A PUT replaces the whole protection object, so anything not restated here
+    # is switched off. Gate on the block existing, not on the context count: a
+    # repo can require status checks with an empty context list ("require
+    # branches to be up to date" on its own), and dropping that block on an
+    # idempotent re-run would silently weaken protection this script is only
+    # meant to add to.
     required_status_checks: (
-      if $existing.required_status_checks then
-        { strict: $existing.required_status_checks.strict,
-          contexts: ($existing.required_status_checks.contexts // []) }
+      (($existing.required_status_checks.contexts // []) + $requested | unique) as $contexts |
+      if $existing.required_status_checks != null or ($contexts | length) > 0 then
+        { strict: ($existing.required_status_checks.strict // false),
+          contexts: $contexts }
       else null end
     ),
     enforce_admins: ($existing.enforce_admins.enabled // false),
@@ -76,7 +94,9 @@ PAYLOAD="$(jq -n --argjson existing "$EXISTING" '
 
 echo "$PAYLOAD" | gh api -X PUT "repos/$NWO/branches/$DEFAULT_BRANCH/protection" \
   --input - > /dev/null
-echo "==> Branch protection: 1 approving review required, stale approvals dismissed (existing checks preserved)"
+REQUIRED_NOW="$(echo "$PAYLOAD" | jq -r '.required_status_checks.contexts // [] | join(", ")')"
+echo "==> Branch protection: 1 approving review required, stale approvals dismissed"
+echo "==> Required status checks: ${REQUIRED_NOW:-none}"
 
 if [ "$(echo "$PAYLOAD" | jq -r .enforce_admins)" = "true" ]; then
   echo "==> WARNING: enforce_admins is ON for this repo (pre-existing; preserved)." >&2

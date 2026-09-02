@@ -1,0 +1,41 @@
+# The `shell-checks` job is a required status check on master. To (re)apply it:
+#   ./scripts/setup-reviewer.sh --repo-dir . --require-check shell-checks
+# (needs a token with admin on the repo).
+name: PR Checks
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  shell-checks:
+    name: shell-checks
+    runs-on: ubuntu-latest
+    env:
+      # Pinned: an unpinned linter turns an unrelated PR red when a new
+      # shellcheck release adds a check.
+      SHELLCHECK_VERSION: v0.11.0
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install yq
+        run: |
+          sudo wget -qO /usr/local/bin/yq \
+            https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+          sudo chmod +x /usr/local/bin/yq
+        # jq is preinstalled on ubuntu-latest runners
+
+      - name: Install shellcheck
+        run: |
+          curl -fsSL \
+            "https://github.com/koalaman/shellcheck/releases/download/${SHELLCHECK_VERSION}/shellcheck-${SHELLCHECK_VERSION}.linux.x86_64.tar.xz" \
+            | tar -xJ -C /tmp
+          sudo install "/tmp/shellcheck-${SHELLCHECK_VERSION}/shellcheck" /usr/local/bin/shellcheck
+          shellcheck --version
+
+      - name: Run shell tests
+        run: ./checks/tests/run-tests.sh
+
+      - name: Lint shell scripts
+        run: ./scripts/lint.sh

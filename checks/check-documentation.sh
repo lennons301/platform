@@ -8,6 +8,7 @@
 source "$(dirname "$0")/lib.sh"
 
 PROJECT_PATH="$1"
+# shellcheck disable=SC2034  # unused here, but every check takes the same two args
 PRODUCT_YAML="$2"
 ISSUES=()
 

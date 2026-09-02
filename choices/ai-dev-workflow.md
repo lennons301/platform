@@ -609,6 +609,11 @@ dismissed on push — existing rules preserved), enables auto-merge, creates the
 `human-signoff` label, seeds `docs/agents/review-gates.yaml` (commit it), and
 invites + accepts the reviewer as a write collaborator.
 
+Add `--require-check <context>` (repeatable) to make a CI status check gate the
+branch too, naming the check run as GitHub reports it — for the platform repo
+itself, `--require-check shell-checks`. Contexts already required are kept; the
+flag adds. Needs admin on the repo, so it is a human step, not an agent one.
+
 **Repo permission rules:** each headless pass pre-approves, via
 `--allowedTools`, exactly the command verbs its prompt (or the agent
 definition it launches) instructs — the implement pass's workflow verbs

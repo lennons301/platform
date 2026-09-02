@@ -70,6 +70,7 @@ verify() {
 
 assert_eq "plain verdict line" "approve" \
   "$(claimed_review_verdict "$(log 'VERDICT: approve')")"
+# shellcheck disable=SC2016  # the backticks are literal markdown in the fixture log line
 assert_eq "markdown around the marker" "approve" \
   "$(claimed_review_verdict "$(log '**VERDICT:** `approve`')")"
 assert_eq "trailing reasoning on the line" "approve" \

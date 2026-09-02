@@ -8,7 +8,19 @@ require_yq
 PROJECT_PATH="$1"
 PRODUCT_YAML="$2"
 SCRIPT_DIR="$(dirname "$0")"
-MANIFEST="$SCRIPT_DIR/../versions/manifest.yaml"
+# Overridable so the tests can pin their own floors: versions/manifest.yaml is
+# reviewed quarterly, and tests written against the live floors would turn red
+# on the next bump — on a required check, on a PR that only edits the manifest.
+MANIFEST="${VERSIONS_MANIFEST:-$SCRIPT_DIR/../versions/manifest.yaml}"
+
+# The manifest describes one ecosystem (Node/TS). A repo outside it — the
+# platform repo itself is shell, YAML and Markdown — has no version of
+# node/next/react to report, and "unknown" there is a category error, not a
+# gap. Same escape hatch every other check offers.
+if has_divergence "$PRODUCT_YAML" "versions"; then
+  echo -e "  versions: ${DIVG} (intentional divergence)"
+  exit 0
+fi
 
 if [ ! -f "$MANIFEST" ]; then
   echo -e "  versions: ${FAIL} manifest not found: $MANIFEST"
