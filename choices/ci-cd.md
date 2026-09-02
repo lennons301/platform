@@ -128,6 +128,64 @@ The logic lives in `scripts/milestone-autoclose.sh` in this repo (runnable
 locally with `--dry-run`), so fixes reach every product without a copy-paste
 round.
 
+## Estate conformity feed (platform repo only)
+
+The platform repo's own `Estate Conformity Check` measures every product daily
+and files gap issues. Where its snapshot goes is not a detail: `AGENTS.md` calls
+`data/conformity-snapshot.json` "the machine-readable contract between checks,
+create-issues.sh, and the planned estate dashboard".
+
+It used to `git push` that file straight to `master`. Once `setup-reviewer.sh`
+put branch protection on the platform repo's own default branch, every push was
+rejected with `GH006` — and because the failing step ran before gap-filing, a
+month of runs measured the estate and threw the result away. Nothing alarmed.
+
+The snapshot now has two homes, written by `scripts/snapshot-publish.sh`:
+
+| Where | Refreshed | Read by |
+| --- | --- | --- |
+| `automation/conformity-snapshot` branch | every run | the estate dashboard, the watchdog |
+| `data/conformity-snapshot.json` on the default branch | by PR, when the conformity content changes | humans, `create-issues.sh` defaults |
+
+The feed branch is rebuilt from the default branch each run and force-pushed, so
+its diff is always exactly one file — it never needs merging or conflict
+resolution, and nothing but the publisher writes to it. Consumers that want the
+current picture should read that branch; the committed copy is the reviewed,
+human-facing record and moves only when the *conformity content* changes, not
+when a timestamp does.
+
+The PR is opened with auto-merge armed. It is deliberately *gate-clear* — it
+touches only `data/conformity-snapshot.json`, which matches no glob in
+`standards/review-gates.yaml` — so one approval lands it and nobody has to come
+back to press merge. Branch protection still requires that approval; arming
+removes the second human step, not the first. A test pins the gate-clearance,
+because a gate glob that swallowed the snapshot path would re-stall the
+committed copy in exactly the silent way this whole section exists to prevent.
+
+Merging that PR is itself a push to the default branch, which would start the
+conformity job again. The old direct-push path used `[skip ci]`; a merge commit
+is composed by GitHub and varies with the merge strategy, so the guard lives on
+the trigger instead — `paths-ignore: ['data/**']`, which makes a snapshot-only
+push the job's own echo regardless of how it was merged.
+
+Four rules hold this together, and each one is a test in `checks/tests/`:
+
+- **Gap-filing is not downstream of bookkeeping.** "Create issues for gaps" runs
+  before the snapshot is persisted, and persistence runs under `if: always()`.
+  Either can fail without suppressing the other; a persist failure still fails
+  the run.
+- **Silence is a failure state.** `Estate Conformity Watchdog` is a *separate*
+  daily workflow, because a check inside the conformity job cannot notice a job
+  that never ran. It reads the feed branch and calls
+  `scripts/conformity-alarm.sh`, which files exactly one `ready-for-human`
+  tracking issue once the snapshot passes 48h old and closes it when fresh
+  snapshots resume. The conformity workflow calls the same script on `failure()`.
+- **One open issue, no comment stream.** A repeat alarm is a no-op. An alarm
+  that comments daily is an alarm people mute, which is how a month went by.
+- **The publisher's output cannot re-trigger the publisher.** The snapshot PR
+  merge is filtered out of the `push` trigger by path, so the feed does not
+  chase its own tail.
+
 ## Conventions
 
 - The workflow file is called `ci.yml` (not `test.yml`, `checks.yml`, etc.)
