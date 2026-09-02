@@ -66,6 +66,15 @@ docs/                — presentations and design specs
 # protection, auto-merge, human-signoff + workflow:* labels, reviewer collaborator
 ./scripts/setup-reviewer.sh --repo-dir <project-path> [--require-check <context>]
 
+# Publish a freshly generated snapshot (feed branch always, PR when the
+# conformity content changed) — what the conformity workflow runs
+./scripts/snapshot-publish.sh --snapshot data/conformity-snapshot.json \
+  --repo lennons301/platform [--dry-run]
+
+# Raise/clear the one tracking issue for a conformity feed that stopped moving
+./scripts/conformity-alarm.sh --repo lennons301/platform \
+  --snapshot data/conformity-snapshot.json [--max-age-hours 48] [--dry-run]
+
 # Close a milestone once its last open issue closes (what the reusable
 # milestone-autoclose workflow runs; safe to try locally with --dry-run)
 ./scripts/milestone-autoclose.sh --repo <owner/name> --milestone <n> [--dry-run]
@@ -127,7 +136,25 @@ docs/                — presentations and design specs
 - Check output line format (`  <dim>: ✓|✗|✓* (details)`) is a parsed contract — changes require updating `parse_check_output` in checks/lib.sh and checks/tests/test-parse.sh
 - Adding a check means registering it in `checks/check-all.sh` **and** bumping the dimension count in `checks/tests/test-snapshot.sh`
 - `create-issues.sh` routes gaps by dimension: mechanical ones get `platform-upgrade`, ones needing a human decision get `ready-for-human` (see `issue_label`)
-- `data/conformity-snapshot.json` is the machine-readable contract between checks, create-issues.sh, and the planned estate dashboard
+- `data/conformity-snapshot.json` is the machine-readable contract between
+  checks, create-issues.sh, and the planned estate dashboard. It has two homes:
+  the `automation/conformity-snapshot` branch (force-updated every conformity
+  run — read this one for the current picture) and the default branch, where
+  `scripts/snapshot-publish.sh` lands it by PR when the conformity content
+  changes. CI never pushes to the protected default branch (see "Estate
+  conformity feed" in `choices/ci-cd.md`). That PR is opened with auto-merge
+  armed and must stay gate-clear — a `standards/review-gates.yaml` glob that
+  matched `data/**` would re-stall the committed copy, so
+  `checks/tests/test-conformity-workflow.sh` asserts it does not. The snapshot
+  merge is kept out of the workflow's own `push` trigger by
+  `paths-ignore: ['data/**']`
+- Conformity gap-filing must never be downstream of snapshot bookkeeping: in
+  `.github/workflows/conformity.yml`, "Create issues for gaps" precedes
+  "Publish snapshot" and persistence runs under `if: always()`. A dead feed
+  alarms via `scripts/conformity-alarm.sh` — from the separate
+  `conformity-watchdog.yml` (snapshot older than 48h) and from the conformity
+  job itself on `failure()`. `checks/tests/test-conformity-workflow.sh` guards
+  that wiring
 - This repo is audited like any other: `products/platform.yaml` is its registry
   entry, so `check-estate.sh` reports on it. Dimensions the estate standards
   assume an application toolchain for (versions, environments, linting) are

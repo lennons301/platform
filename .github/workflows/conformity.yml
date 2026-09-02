@@ -2,12 +2,22 @@ name: Estate Conformity Check
 on:
   push:
     branches: [main, master]
+    # Recursion guard. This job's own output lands on the default branch (the
+    # snapshot PR merging), and that push would otherwise start it again. The
+    # old direct-push path used `[skip ci]` in the commit message; a PR merge
+    # has no commit message this job controls — GitHub composes it, and squash
+    # vs merge changes it — so the guard moves to the path instead. A push that
+    # touches nothing but `data/**` is this job's own echo and is ignored.
+    paths-ignore:
+      - 'data/**'
   schedule:
     - cron: '0 6 * * *'   # daily 06:00 UTC — catches drift without a platform push
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: write        # push the snapshot feed branch (never the default branch)
+  pull-requests: write   # open the snapshot PR
+  issues: write          # raise the feed alarm on failure
 
 jobs:
   check:
@@ -39,6 +49,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
 
       - name: Run conformity checks and emit snapshot
+        id: snapshot
         run: |
           mkdir -p data
           ./checks/check-estate.sh --repos-dir /tmp/repos --json data/conformity-snapshot.json
@@ -47,23 +58,56 @@ jobs:
           # and collaborators via the API; without a token it warns and skips.
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
 
-      - name: Commit snapshot if semantically changed
-        run: |
-          # Ignore generated_at/platform_commit churn — only commit when the
-          # conformity content actually changed.
-          if git show HEAD:data/conformity-snapshot.json > /tmp/old-snapshot.json 2>/dev/null && \
-             [ "$(jq -S 'del(.generated_at, .platform_commit)' /tmp/old-snapshot.json)" = \
-               "$(jq -S 'del(.generated_at, .platform_commit)' data/conformity-snapshot.json)" ]; then
-            echo "No semantic change to snapshot; skipping commit."
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/conformity-snapshot.json
-          git commit -m "chore: update conformity snapshot [skip ci]"
-          git push
-
+      # Gap-filing comes FIRST of everything downstream of the checks, and every
+      # step below is a bookkeeping step guarded so it can neither skip this one
+      # nor be skipped by it. That is the whole point: a rejected push once
+      # aborted the job before this step and a month of gap issues went unfiled
+      # as collateral damage.
+      #
+      # `always() &&` is load-bearing, not decoration — a bare `if:` has an
+      # implicit success() ANDed onto it, which would let any earlier step's
+      # failure silently skip gap-filing all over again.
       - name: Create issues for gaps
+        if: always() && steps.snapshot.outcome == 'success'
         run: ./checks/create-issues.sh --snapshot data/conformity-snapshot.json
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+
+      # Belt and braces: whatever happens to the publish step below, the run
+      # this snapshot came from carries a downloadable copy of it.
+      - name: Upload snapshot artifact
+        if: always() && steps.snapshot.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: conformity-snapshot
+          path: data/conformity-snapshot.json
+          retention-days: 90
+
+      # This repo is subject to the reviewer flow it publishes, so the snapshot
+      # cannot be pushed to the protected default branch. It goes to a feed
+      # branch every run, and onto the default branch by PR when the conformity
+      # content actually changed. A failure here still fails the run.
+      - name: Publish snapshot
+        if: always() && steps.snapshot.outcome == 'success'
+        run: |
+          ./scripts/snapshot-publish.sh \
+            --snapshot data/conformity-snapshot.json \
+            --repo "$GITHUB_REPOSITORY" \
+            --base "${{ github.event.repository.default_branch }}"
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+
+      # Scheduled failures are invisible unless something says so out loud.
+      # The watchdog catches a job that never ran at all; this catches the
+      # one that ran and broke.
+      - name: Raise the feed alarm
+        if: failure()
+        run: |
+          # Exit 1 means "alarm raised" — expected here, the run is already
+          # red. Exit 2 means the alarm itself failed and must not be swallowed.
+          ./scripts/conformity-alarm.sh \
+            --repo "$GITHUB_REPOSITORY" \
+            --failed-run "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            || [ "$?" -eq 1 ]
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}

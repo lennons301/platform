@@ -91,6 +91,14 @@ require_jq() {
   fi
 }
 
+# ISO-8601 UTC timestamp -> epoch seconds on stdout; empty and non-zero when
+# it cannot be parsed. GNU and BSD `date` disagree on the flags, so try both:
+# on macOS the GNU form alone makes every timestamp look unreadable.
+iso_to_epoch() {
+  date -u -d "$1" +%s 2>/dev/null ||
+    date -u -j -f "%Y-%m-%dT%H:%M:%SZ" "$1" +%s 2>/dev/null
+}
+
 # Is the gh CLI available and authenticated? Prints why not on stdout and
 # returns 1; returns 0 silently when it is.
 # Checks that read the GitHub API use this to warn-and-skip rather than let

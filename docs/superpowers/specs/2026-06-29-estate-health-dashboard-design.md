@@ -46,10 +46,18 @@ A small **Next.js 16 app** at `apps/dashboard/` in this repo, deployed to
 **Plane 1 — Conformity (snapshot, CI-refreshed).** A `--json` emitter on
 `check-estate.sh` writes `conformity-snapshot.json` — per project, per dimension:
 pass / fail / divergence, plus version drift and the gap list. CI (extending
-`.github/workflows/conformity.yml`) commits the snapshot after running checks; a
+`.github/workflows/conformity.yml`) publishes the snapshot after running checks; a
 daily scheduled run keeps it fresh without a platform push. The app renders this
 JSON. **The snapshot is the contract** between the checks and the dashboard — the
 app never executes shell.
+
+> **Amended 2026-09-01 (issue #25):** CI can no longer commit the snapshot to
+> the protected default branch. It force-updates the
+> `automation/conformity-snapshot` branch every run and opens a PR onto the
+> default branch only when the conformity content changes. A dashboard wanting
+> the current picture should read the **feed branch**, not the default branch,
+> or it will render a picture that is as stale as the last unmerged PR. See
+> "Estate conformity feed" in `choices/ci-cd.md`.
 
 **Plane 2 — Operational health (live, request-time).** Server-side route handlers
 (`/api/ops`) fetch from the estate's chosen providers, with tokens from
@@ -90,7 +98,7 @@ apps/dashboard/
     conformity.ts            # snapshot JSON -> typed ConformityReport (pure)
     ops/{vercel,sentry,betterstack}.ts  # token + id -> normalized status (server-only)
   components/                # ProjectCard, OpsBadge, ConformityGrid, StatusPill
-  data/conformity-snapshot.json         # committed by CI
+  data/conformity-snapshot.json         # published by CI (see the amendment above)
 checks/
   check-estate.sh            # + a --json emitter (the snapshot contract)
 ```

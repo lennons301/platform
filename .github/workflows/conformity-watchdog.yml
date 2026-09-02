@@ -1,0 +1,49 @@
+# Watches the watcher. The Estate Conformity Check failed on every scheduled
+# run for a month without anyone noticing, because a job that never reports is
+# indistinguishable from a job that has nothing to say. This one job's whole
+# purpose is to make that state loud: it reads the conformity feed and files a
+# tracking issue when the feed has stopped moving — including when the
+# conformity workflow never ran at all (disabled schedule, deleted workflow,
+# runner outage), which an in-workflow check could never catch.
+name: Estate Conformity Watchdog
+
+on:
+  schedule:
+    - cron: '0 9 * * *'   # daily 09:00 UTC — three hours after the 06:00 check
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  watchdog:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve the newest published snapshot
+        env:
+          FEED_BRANCH: automation/conformity-snapshot
+          SNAPSHOT_PATH: data/conformity-snapshot.json
+        run: |
+          # The feed branch is refreshed on every conformity run; the committed
+          # copy only moves when the content changes and its PR is merged. Age
+          # must measure the pipeline, not merge latency — so prefer the feed
+          # and fall back to the committed copy only before the first publish.
+          if git fetch --quiet --depth 1 origin "$FEED_BRANCH" 2>/dev/null &&
+             git show "FETCH_HEAD:$SNAPSHOT_PATH" > /tmp/feed-snapshot.json 2>/dev/null; then
+            echo "Read the snapshot from $FEED_BRANCH."
+          else
+            echo "No feed branch yet — falling back to the committed snapshot."
+            cp "$SNAPSHOT_PATH" /tmp/feed-snapshot.json || true
+          fi
+
+      - name: Alarm if the feed has gone quiet
+        run: |
+          ./scripts/conformity-alarm.sh \
+            --repo "$GITHUB_REPOSITORY" \
+            --snapshot /tmp/feed-snapshot.json \
+            --max-age-hours 48
+        env:
+          GH_TOKEN: ${{ github.token }}
