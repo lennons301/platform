@@ -606,7 +606,10 @@ Work GitHub issue #$ISSUE of this repo. This is attempt $ATTEMPT of $MAX_ATTEMPT
    any workflow named by the issue's labels; otherwise use your judgement.
 2. Read AGENTS.md / CLAUDE.md, CONTEXT.md, and relevant docs/adr/ entries
    before writing code.
-3. Implement on the current branch ($BRANCH). Make small atomic commits.
+3. Implement on the current branch ($BRANCH). Make small atomic commits. If
+   the change alters project structure, commands, dependencies, conventions
+   or configuration, fold that into AGENTS.md in the same PR — rewrite the
+   affected section so it reads as current; never append a log entry.
 4. Validate: run the repo's tests and lint (just test / just lint if a
    justfile exists; wrap in 'doppler run --' if the checks need the repo's
    env — that wrapper is pre-approved). Do not proceed with failing checks.

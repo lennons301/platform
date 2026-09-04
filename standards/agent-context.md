@@ -17,7 +17,7 @@ Agent context is the single file an AI agent (or a new developer) reads to under
 
 The goal is that `AGENTS.md` always reflects the project as it is right now — not as it was when someone last remembered to update the docs.
 
-**Hooks** are the recommended enforcement mechanism. A post-commit or pre-push hook (or a Claude Code hook, Copilot hook, etc.) should prompt or automate the incorporation of changes into `AGENTS.md` when relevant files change. "Relevant" typically means changes to:
+**The ticket-loop is the enforcement mechanism.** Every implement pass reads `AGENTS.md` before writing code and is instructed to fold any relevant change back into it in the same PR; the ticket-reviewer checks that a PR which changed structure, commands, dependencies, conventions or configuration left `AGENTS.md` describing the repo as it now is, and requests changes if it did not. Work done outside the loop carries the same duty, by hand. Hooks (post-commit, pre-push, or an agent hook) are optional — a repo may add one as a reminder, but none is required and none is checked. "Relevant" typically means changes to:
 
 - Project structure (new directories, moved files)
 - Commands (new scripts, changed build steps)
@@ -25,13 +25,13 @@ The goal is that `AGENTS.md` always reflects the project as it is right now — 
 - Conventions (new patterns, architectural decisions)
 - Configuration (new environment variables, changed providers)
 
-The hook should trigger an update that **rewrites the affected sections** of `AGENTS.md` to reflect current state. It must not append a dated entry, add a changelog section, or leave stale content above with corrections below. The file should read as if it was written today.
+The update **rewrites the affected sections** of `AGENTS.md` to reflect current state. It must not append a dated entry, add a changelog section, or leave stale content above with corrections below. The file should read as if it was written today. Development history — phases, roadmaps, what shipped when — belongs in a linked doc, not in `AGENTS.md`. Size limits and the README requirement are in the documentation standard.
 
 ## What goes where
 
 | File | Contains | Updated |
 |---|---|---|
-| `AGENTS.md` | Project overview, tech stack, commands, structure, conventions, platform context | Continuously, via hooks and development workflow |
+| `AGENTS.md` | Project overview, tech stack, commands, structure, conventions, platform context | Continuously, by the ticket-loop implement pass (reviewer-checked) |
 | `CLAUDE.md` | `@AGENTS.md` reference + any Claude Code-specific instructions | Rarely — only when Claude-specific behaviour changes |
 | `GEMINI.md` | `@AGENTS.md` reference + any Gemini-specific instructions | Rarely |
 | `.github/copilot-instructions.md` | Copilot-specific instructions, referencing AGENTS.md content | Rarely |
@@ -39,5 +39,5 @@ The hook should trigger an update that **rewrites the affected sections** of `AG
 ## How to comply
 
 1. Use `templates/AGENTS.md.template` from the platform repo as a starting point for new projects.
-2. Set up a hook to maintain the file (see guidance above).
+2. Nothing to install: the ticket-loop prompts carry the requirement. Working outside the loop, update it yourself in the same change.
 3. Ensure tool-specific files reference `AGENTS.md` rather than duplicating content.
