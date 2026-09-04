@@ -33,4 +33,16 @@ architecture:
     - docker-compose.yml
     - supabase/
 
-divergences: []
+divergences:
+  - standard: linting
+    choice: eslint
+    reason: >
+      Pending migration to Biome (lemons#40). Project is still on the Next.js
+      default ESLint setup from scaffold; AGENTS.md documents `npm run lint`
+      as ESLint until the migration lands.
+  - standard: dev-environment
+    choice: none
+    reason: >
+      Pending adoption of mise + just (lemons#39). Project currently relies on
+      global Node/npm installs and package.json scripts, wrapped in
+      `doppler run --` for secrets.
