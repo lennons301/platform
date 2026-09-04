@@ -89,7 +89,7 @@ contract* (see *Capability contracts*). There are four:
 
 - **Implement pass** — the execution prompt proper: an eight-step script that
   reads issue #N *as the spec* → reads `AGENTS.md`/`CONTEXT.md`/ADRs → implements
-  in small atomic commits → validates (tests/lint under `doppler run`) →
+  in small atomic commits, folding structural changes into `AGENTS.md` → validates (tests/lint under `doppler run`) →
   self-reviews with `/code-review` → pushes and opens a PR (`Closes #N`) →
   confirms the PR is `MERGEABLE` → and, if genuinely blocked, comments and
   relabels `ready-for-human` (the escape hatch). One attempt per invocation, up

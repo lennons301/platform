@@ -48,6 +48,10 @@ before you run, and usually tells you in your prompt. Verify with
      recorded decisions
    - correctness: edge cases, error handling, tests that actually test the
      change
+   - `AGENTS.md`: if the diff changed structure, commands, dependencies,
+     conventions or configuration, does `AGENTS.md` still describe the repo
+     as it now is? A rewritten section is right; an appended log entry, or
+     nothing at all, is a request-changes
    - the smell baseline below
 
 ### Smell baseline

@@ -135,6 +135,13 @@ docs/                — presentations and design specs
   so script and workflow always come from the same commit
 - Check output line format (`  <dim>: ✓|✗|✓* (details)`) is a parsed contract — changes require updating `parse_check_output` in checks/lib.sh and checks/tests/test-parse.sh
 - Adding a check means registering it in `checks/check-all.sh` **and** bumping the dimension count in `checks/tests/test-snapshot.sh`
+- `checks/check-documentation.sh` fails on a missing or scaffold-boilerplate
+  README, a missing AGENTS.md section, or a tool file (`CLAUDE.md`,
+  `GEMINI.md`, `.github/copilot-instructions.md`) that is more than a thin
+  `@AGENTS.md` pointer; it warns (exit 0, a `~` line) when AGENTS.md is over
+  48 KB or has a line over 2,000 chars. Thresholds are env-tunable
+  (`AGENTS_MD_MAX_BYTES`, `AGENTS_MD_MAX_LINE`, `TOOL_FILE_MAX_LINES`) so the
+  tests exercise them with small fixtures
 - `create-issues.sh` routes gaps by dimension: mechanical ones get `platform-upgrade`, ones needing a human decision get `ready-for-human` (see `issue_label`)
 - `data/conformity-snapshot.json` is the machine-readable contract between
   checks, create-issues.sh, and the planned estate dashboard. It has two homes:
