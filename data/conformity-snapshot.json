@@ -1,8 +1,8 @@
 {
-  "generated_at": "2026-07-31T08:46:12Z",
-  "platform_commit": "2c868ac",
-  "total_gaps": 14,
-  "total_products_checked": 4,
+  "generated_at": "2026-09-05T09:39:02Z",
+  "platform_commit": "6c01f83",
+  "total_gaps": 13,
+  "total_products_checked": 5,
   "products": [
     {
       "name": "interlude",
@@ -10,7 +10,7 @@
       "category": "infrastructure",
       "status": "active",
       "checked": true,
-      "gap_count": 5,
+      "gap_count": 4,
       "dimensions": [
         {
           "dimension": "architecture",
@@ -29,8 +29,8 @@
         },
         {
           "dimension": "documentation",
-          "status": "fail",
-          "details": "no AGENTS.md — see standards/agent-context.md"
+          "status": "warn",
+          "details": "AGENTS.md is 96KB, over 48KB — move reference detail into linked docs/; AGENTS.md has 20 line(s) over 2000 chars — break them up or move them out"
         },
         {
           "dimension": "domain-modelling",
@@ -49,6 +49,11 @@
         },
         {
           "dimension": "local-development",
+          "status": "pass",
+          "details": ""
+        },
+        {
+          "dimension": "review-gate",
           "status": "pass",
           "details": ""
         },
@@ -94,8 +99,8 @@
         },
         {
           "dimension": "documentation",
-          "status": "pass",
-          "details": ""
+          "status": "warn",
+          "details": "AGENTS.md is 57KB, over 48KB — move reference detail into linked docs/; AGENTS.md has 8 line(s) over 2000 chars — break them up or move them out"
         },
         {
           "dimension": "domain-modelling",
@@ -114,6 +119,11 @@
         },
         {
           "dimension": "local-development",
+          "status": "pass",
+          "details": ""
+        },
+        {
+          "dimension": "review-gate",
           "status": "pass",
           "details": ""
         },
@@ -140,7 +150,7 @@
       "category": "product",
       "status": "active",
       "checked": true,
-      "gap_count": 6,
+      "gap_count": 4,
       "dimensions": [
         {
           "dimension": "architecture",
@@ -154,8 +164,8 @@
         },
         {
           "dimension": "dev-environment",
-          "status": "fail",
-          "details": "no version-manager config (.mise.toml or .tool-versions) no justfile (dev_environment=mise-just)"
+          "status": "divergence",
+          "details": "intentional divergence"
         },
         {
           "dimension": "documentation",
@@ -174,11 +184,16 @@
         },
         {
           "dimension": "linting",
-          "status": "fail",
-          "details": "no biome.json (linting=biome) no pre-commit hook (.husky/pre-commit, .pre-commit-config.yaml, or lefthook.yml)"
+          "status": "divergence",
+          "details": "intentional divergence"
         },
         {
           "dimension": "local-development",
+          "status": "pass",
+          "details": ""
+        },
+        {
+          "dimension": "review-gate",
           "status": "pass",
           "details": ""
         },
@@ -224,8 +239,8 @@
         },
         {
           "dimension": "documentation",
-          "status": "pass",
-          "details": ""
+          "status": "warn",
+          "details": "AGENTS.md is 58KB, over 48KB — move reference detail into linked docs/"
         },
         {
           "dimension": "domain-modelling",
@@ -248,6 +263,11 @@
           "details": ""
         },
         {
+          "dimension": "review-gate",
+          "status": "pass",
+          "details": ""
+        },
+        {
           "dimension": "secrets",
           "status": "pass",
           "details": ""
@@ -261,6 +281,76 @@
           "dimension": "versions",
           "status": "pass",
           "details": ""
+        }
+      ]
+    },
+    {
+      "name": "platform",
+      "repo": "lennons301/platform",
+      "category": "infrastructure",
+      "status": "active",
+      "checked": true,
+      "gap_count": 2,
+      "dimensions": [
+        {
+          "dimension": "architecture",
+          "status": "fail",
+          "details": "no docs/architecture/ directory"
+        },
+        {
+          "dimension": "ci-cd",
+          "status": "pass",
+          "details": ""
+        },
+        {
+          "dimension": "dev-environment",
+          "status": "pass",
+          "details": ""
+        },
+        {
+          "dimension": "documentation",
+          "status": "pass",
+          "details": ""
+        },
+        {
+          "dimension": "domain-modelling",
+          "status": "fail",
+          "details": "no CONTEXT.md — no domain model has been recorded"
+        },
+        {
+          "dimension": "environments",
+          "status": "divergence",
+          "details": "intentional divergence"
+        },
+        {
+          "dimension": "linting",
+          "status": "divergence",
+          "details": "intentional divergence"
+        },
+        {
+          "dimension": "local-development",
+          "status": "pass",
+          "details": "no database"
+        },
+        {
+          "dimension": "review-gate",
+          "status": "pass",
+          "details": ""
+        },
+        {
+          "dimension": "secrets",
+          "status": "pass",
+          "details": ""
+        },
+        {
+          "dimension": "testing",
+          "status": "pass",
+          "details": ""
+        },
+        {
+          "dimension": "versions",
+          "status": "divergence",
+          "details": "intentional divergence"
         }
       ]
     }
